@@ -5,10 +5,13 @@ on:
   push:
     branches: [main, master]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -30,16 +33,11 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      - name: Check llama.rn native libraries
-        run: |
-          ls node_modules/llama.rn/android/src/main/jniLibs 2>/dev/null || echo "jniLibs not found (will fail below if libs are required)"
-          find node_modules/llama.rn -name "librnllama*.so" | head -5
-
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
 
       - name: More memory for Gradle
-        run: echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> android/gradle.properties
+        run: printf "\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g\n" >> android/gradle.properties
 
       - name: Build release APK (arm64)
         working-directory: android
@@ -51,3 +49,12 @@ jobs:
           name: vision-chat-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      - name: Publish APK to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/*.apk VisionChat.apk
+          gh release create "apk-${{ github.run_number }}" VisionChat.apk \
+            --title "Vision Chat APK #${{ github.run_number }}" \
+            --notes "Debug-signed arm64 APK. Install on Android (allow unknown sources)."

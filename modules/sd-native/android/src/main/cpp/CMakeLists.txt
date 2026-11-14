@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # stable-diffusion.cpp клонируется в third_party скриптом/CI (см. README и workflow)
-set(SD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/stable-diffusion.cpp")
+set(SD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/stable-diffusion.cpp")
 if(NOT EXISTS "${SD_DIR}/CMakeLists.txt")
   message(FATAL_ERROR "stable-diffusion.cpp not found at ${SD_DIR}. Run scripts/fetch-sd.sh first.")
 endif()

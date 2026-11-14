@@ -7,12 +7,20 @@ export type ChatMsg = {
   text: string;
   images: string[];
   stats?: string;
+  generated?: boolean;
 };
 
 let ctx: LlamaContext | null = null;
+let lastLoad: { modelUri: string; mmprojUri: string; settings: Settings } | null = null;
 
 export function isLoaded(): boolean {
   return ctx !== null;
+}
+
+/** Перезагружает последнюю модель, если её выгрузили (например, ради рисования). */
+export async function ensureLoaded(): Promise<void> {
+  if (ctx || !lastLoad) return;
+  await loadModel(lastLoad.modelUri, lastLoad.mmprojUri, lastLoad.settings);
 }
 
 export async function unloadModel(): Promise<void> {
@@ -33,6 +41,7 @@ export async function loadModel(
   s: Settings,
 ): Promise<{ vision: boolean }> {
   await unloadModel();
+  lastLoad = { modelUri, mmprojUri, settings: s };
   // GPU-ускорение llama.rn на Android есть только для Qualcomm Adreno/Hexagon.
   // На Dimensity (Mali) работаем на CPU, поэтому n_gpu_layers = 0.
   const c = await initLlama({
@@ -81,10 +90,11 @@ function buildMessages(history: ChatMsg[], system: string) {
 export async function generate(
   history: ChatMsg[],
   s: Settings,
-  onToken: (accumulated: string) => void,
+  onToken: (accumulated: string, count: number) => void,
 ): Promise<{ text: string; stats: string }> {
   if (!ctx) throw new Error('Модель не загружена');
   let acc = '';
+  let count = 0;
   const res = await ctx.completion(
     {
       messages: buildMessages(history, s.systemPrompt),
@@ -95,7 +105,8 @@ export async function generate(
     },
     (data) => {
       acc += data.token;
-      onToken(acc);
+      count += 1;
+      onToken(acc, count);
     },
   );
   const t = res.timings;

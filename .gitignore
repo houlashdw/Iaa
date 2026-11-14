@@ -1,5 +1,6 @@
 node_modules/
-android/
-ios/
+/android/
+/ios/
 .expo/
 *.apk
+modules/sd-native/third_party/

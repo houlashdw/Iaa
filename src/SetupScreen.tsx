@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { PRESETS } from './config';
+import { PRESETS, SD_PRESET } from './config';
 import {
   DownloadHandle,
   ModelFile,
@@ -27,13 +27,17 @@ type Props = {
   files: ModelFile[];
   modelFile: string | null;
   mmprojFile: string | null;
+  sdFile: string | null;
   setModelFile: (n: string | null) => void;
   setMmprojFile: (n: string | null) => void;
+  setSdFile: (n: string | null) => void;
   refresh: () => Promise<void>;
   onStart: () => void;
 };
 
-type Job = { kind: 'model' | 'mmproj'; url: string };
+type Job = { kind: 'model' | 'mmproj' | 'sd'; url: string };
+
+const looksLikeSd = (n: string) => /(^|[-_.])(sd|sdxl|sdxs|stable|turbo|diffusion|flux)/i.test(n);
 
 export default function SetupScreen(p: Props) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -72,6 +76,7 @@ export default function SetupScreen(p: Props) {
             },
           );
           if (j.kind === 'model') p.setModelFile(name);
+          else if (j.kind === 'sd') p.setSdFile(name);
           else p.setMmprojFile(name);
         }
         await p.refresh();
@@ -99,6 +104,7 @@ export default function SetupScreen(p: Props) {
       setBusy(`Копирую файл: ${a.name}`);
       const name = await importPickedFile(a.uri, a.name);
       if (name.toLowerCase().includes('mmproj')) p.setMmprojFile(name);
+      else if (looksLikeSd(name)) p.setSdFile(name);
       else p.setModelFile(name);
       await p.refresh();
     } catch (e: any) {
@@ -118,6 +124,7 @@ export default function SetupScreen(p: Props) {
           await deleteModelFile(f.name);
           if (p.modelFile === f.name) p.setModelFile(null);
           if (p.mmprojFile === f.name) p.setMmprojFile(null);
+          if (p.sdFile === f.name) p.setSdFile(null);
           await p.refresh();
         },
       },
@@ -159,6 +166,18 @@ export default function SetupScreen(p: Props) {
             </Pressable>
           </View>
         ))}
+
+        <View style={{ marginBottom: 12 }}>
+          <Text style={S.text}>🎨 {SD_PRESET.title}</Text>
+          <Text style={S.dim}>{SD_PRESET.note}</Text>
+          <Pressable
+            disabled={!!busy}
+            onPress={() => runJobs([{ kind: 'sd', url: SD_PRESET.url }])}
+            style={[S.btn2, { marginTop: 8 }, busy ? S.disabled : null]}
+          >
+            <Text style={S.btn2Text}>Скачать художника (необязательно)</Text>
+          </Pressable>
+        </View>
 
         <Text style={[S.dim, { marginTop: 4 }]}>Или свои ссылки на .gguf (Hugging Face):</Text>
         <TextInput
@@ -252,6 +271,7 @@ export default function SetupScreen(p: Props) {
           p.files.map((f) => {
             const isModel = p.modelFile === f.name;
             const isProj = p.mmprojFile === f.name;
+            const isSd = p.sdFile === f.name;
             return (
               <View key={f.name} style={{ marginBottom: 12 }}>
                 <Text style={S.text} numberOfLines={2}>
@@ -275,6 +295,14 @@ export default function SetupScreen(p: Props) {
                       {isProj ? '✓ mmproj' : 'Это mmproj'}
                     </Text>
                   </Pressable>
+                  <Pressable
+                    onPress={() => p.setSdFile(f.name)}
+                    style={[S.btn2, { marginRight: 8 }, isSd ? { borderColor: C.accent } : null]}
+                  >
+                    <Text style={[S.btn2Text, isSd ? { color: C.accent } : null]}>
+                      {isSd ? '✓ Рисует' : 'Это художник'}
+                    </Text>
+                  </Pressable>
                   <Pressable onPress={() => remove(f)} style={S.btn2}>
                     <Text style={[S.btn2Text, { color: C.danger }]}>Удалить</Text>
                   </Pressable>
@@ -294,7 +322,7 @@ export default function SetupScreen(p: Props) {
       </Pressable>
       {!ready ? (
         <Text style={[S.dim, { marginTop: 8 }]}>
-          Нужны оба файла: модель и mmproj (он отвечает за зрение).
+          Нужны оба файла: модель и mmproj (он отвечает за зрение). Художник (рисование) необязателен.
         </Text>
       ) : null}
     </ScrollView>

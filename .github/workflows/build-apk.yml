@@ -5,9 +5,6 @@ on:
   push:
     branches: [main, master]
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,6 +24,9 @@ jobs:
       - name: Install JS dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Fetch stable-diffusion.cpp
+        run: ./scripts/fetch-sd.sh
+
       - name: Typecheck
         run: npx tsc --noEmit
 
@@ -39,7 +39,7 @@ jobs:
         run: npx expo prebuild --platform android --no-install
 
       - name: More memory for Gradle
-        run: printf "\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g\n" >> android/gradle.properties
+        run: echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> android/gradle.properties
 
       - name: Build release APK (arm64)
         working-directory: android
@@ -51,12 +51,3 @@ jobs:
           name: vision-chat-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
-
-      - name: Publish APK to Releases
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cp android/app/build/outputs/apk/release/*.apk VisionChat.apk
-          gh release create "apk-${{ github.run_number }}" VisionChat.apk \
-            --title "Vision Chat APK #${{ github.run_number }}" \
-            --notes "Debug-signed arm64 APK. Install on Android (allow unknown sources)."

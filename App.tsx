@@ -15,6 +15,7 @@ function Root() {
   const [files, setFiles] = useState<ModelFile[]>([]);
   const [modelFile, setModelFile] = useState<string | null>(null);
   const [mmprojFile, setMmprojFile] = useState<string | null>(null);
+  const [sdFile, setSdFile] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
 
@@ -27,6 +28,7 @@ function Root() {
       const st = await loadState();
       setModelFile(st.modelFile);
       setMmprojFile(st.mmprojFile);
+      setSdFile(st.sdFile);
       setSettings(st.settings);
       await refresh();
       setLoaded(true);
@@ -35,11 +37,12 @@ function Root() {
   }, [refresh]);
 
   useEffect(() => {
-    if (loaded) saveState({ modelFile, mmprojFile, settings });
-  }, [loaded, modelFile, mmprojFile, settings]);
+    if (loaded) saveState({ modelFile, mmprojFile, sdFile, settings });
+  }, [loaded, modelFile, mmprojFile, sdFile, settings]);
 
   const model = files.find((f) => f.name === modelFile);
   const proj = files.find((f) => f.name === mmprojFile);
+  const sd = files.find((f) => f.name === sdFile);
 
   return (
     <View
@@ -60,8 +63,10 @@ function Root() {
           files={files}
           modelFile={modelFile}
           mmprojFile={mmprojFile}
+          sdFile={sdFile}
           setModelFile={setModelFile}
           setMmprojFile={setMmprojFile}
+          setSdFile={setSdFile}
           refresh={refresh}
           onStart={() => setScreen('chat')}
         />
@@ -69,6 +74,7 @@ function Root() {
         <ChatScreen
           modelUri={model.uri}
           mmprojUri={proj.uri}
+          sdUri={sd?.uri ?? null}
           modelName={model.name}
           settings={settings}
           onSettingsChange={setSettings}

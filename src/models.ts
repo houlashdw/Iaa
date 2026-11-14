@@ -9,8 +9,11 @@ export type ModelFile = { name: string; uri: string; size: number };
 export type SavedState = {
   modelFile: string | null;
   mmprojFile: string | null;
+  sdFile: string | null;
   settings: Settings;
 };
+
+const STATE_VERSION = 2;
 
 export function fileNameFromUrl(url: string): string {
   const clean = url.split('?')[0].split('#')[0];
@@ -175,20 +178,26 @@ export async function importPickedFile(srcUri: string, name: string): Promise<st
 export async function loadState(): Promise<SavedState> {
   try {
     const raw = await FS.readAsStringAsync(STATE_FILE);
-    const j = JSON.parse(raw) as Partial<SavedState>;
+    const j = JSON.parse(raw) as Partial<SavedState> & { version?: number };
+    // Старые сохранённые настройки (версия < 2) сбрасываем: поменялись потоки по умолчанию.
+    const settings =
+      j.version === STATE_VERSION
+        ? { ...DEFAULT_SETTINGS, ...(j.settings ?? {}) }
+        : { ...DEFAULT_SETTINGS, systemPrompt: j.settings?.systemPrompt ?? DEFAULT_SETTINGS.systemPrompt };
     return {
       modelFile: j.modelFile ?? null,
       mmprojFile: j.mmprojFile ?? null,
-      settings: { ...DEFAULT_SETTINGS, ...(j.settings ?? {}) },
+      sdFile: j.sdFile ?? null,
+      settings,
     };
   } catch {
-    return { modelFile: null, mmprojFile: null, settings: DEFAULT_SETTINGS };
+    return { modelFile: null, mmprojFile: null, sdFile: null, settings: DEFAULT_SETTINGS };
   }
 }
 
 export async function saveState(s: SavedState): Promise<void> {
   try {
-    await FS.writeAsStringAsync(STATE_FILE, JSON.stringify(s));
+    await FS.writeAsStringAsync(STATE_FILE, JSON.stringify({ ...s, version: STATE_VERSION }));
   } catch {
     // не критично
   }

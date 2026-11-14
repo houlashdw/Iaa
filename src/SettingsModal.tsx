@@ -23,6 +23,10 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
   const [img, setImg] = useState(String(settings.imageMaxTokens));
   const [temp, setTemp] = useState(String(settings.temperature));
   const [maxNew, setMaxNew] = useState(String(settings.maxNewTokens));
+  const [sdSteps, setSdSteps] = useState(String(settings.sdSteps));
+  const [sdSize, setSdSize] = useState(String(settings.sdSize));
+  const [sdCfg, setSdCfg] = useState(String(settings.sdCfg));
+  const [sdNeg, setSdNeg] = useState(settings.sdNegative);
 
   const field = (label: string, hint: string, v: string, set: (s: string) => void) => (
     <View style={{ marginTop: 12 }}>
@@ -45,6 +49,10 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
       imageMaxTokens: Math.round(num(img, DEFAULT_SETTINGS.imageMaxTokens, 64, 2048)),
       temperature: num(temp, DEFAULT_SETTINGS.temperature, 0, 2),
       maxNewTokens: Math.round(num(maxNew, DEFAULT_SETTINGS.maxNewTokens, 16, 8192)),
+      sdSteps: Math.round(num(sdSteps, DEFAULT_SETTINGS.sdSteps, 1, 50)),
+      sdSize: Math.round(num(sdSize, DEFAULT_SETTINGS.sdSize, 256, 1024) / 64) * 64,
+      sdCfg: num(sdCfg, DEFAULT_SETTINGS.sdCfg, 0, 15),
+      sdNegative: sdNeg,
     });
   };
 
@@ -83,6 +91,17 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
           img,
           setImg,
         )}
+        <Text style={[S.h2, { marginTop: 24 }]}>Рисование</Text>
+        {field('Размер картинки (px)', '256–1024, кратно 64. 512 = быстро, 768+ = очень долго', sdSize, setSdSize)}
+        {field('Шаги', 'Для SD-Turbo 1–4. Больше шагов = дольше', sdSteps, setSdSteps)}
+        {field('CFG (следование описанию)', 'Для SD-Turbo 1.0. Для обычных SD 1.5 — 6–8', sdCfg, setSdCfg)}
+        <Text style={[S.text, { marginTop: 12 }]}>Негативный промпт</Text>
+        <TextInput
+          style={[S.input, { marginTop: 4, minHeight: 60, textAlignVertical: 'top' }]}
+          value={sdNeg}
+          onChangeText={setSdNeg}
+          multiline
+        />
         <Pressable style={[S.btn, { marginTop: 20 }]} onPress={save}>
           <Text style={S.btnText}>Сохранить</Text>
         </Pressable>

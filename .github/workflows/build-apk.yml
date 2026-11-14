@@ -5,6 +5,9 @@ on:
   push:
     branches: [main, master]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -48,3 +51,12 @@ jobs:
           name: vision-chat-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      - name: Publish APK to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/*.apk VisionChat.apk
+          gh release create "apk-${{ github.run_number }}" VisionChat.apk \
+            --title "Vision Chat APK #${{ github.run_number }}" \
+            --notes "Debug-signed arm64 APK. Install on Android (allow unknown sources)."

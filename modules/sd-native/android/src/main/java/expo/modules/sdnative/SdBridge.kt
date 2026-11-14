@@ -1,5 +1,6 @@
 package expo.modules.sdnative
 
+@androidx.annotation.Keep
 object SdBridge {
   init {
     System.loadLibrary("sdnative")

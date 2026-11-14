@@ -1,0 +1,50 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install JS dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Check llama.rn native libraries
+        run: |
+          ls node_modules/llama.rn/android/src/main/jniLibs 2>/dev/null || echo "jniLibs not found (will fail below if libs are required)"
+          find node_modules/llama.rn -name "librnllama*.so" | head -5
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: More memory for Gradle
+        run: echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> android/gradle.properties
+
+      - name: Build release APK (arm64)
+        working-directory: android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vision-chat-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

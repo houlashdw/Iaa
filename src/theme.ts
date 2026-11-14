@@ -1,0 +1,61 @@
+import { StyleSheet } from 'react-native';
+
+export const C = {
+  bg: '#0f1115',
+  card: '#181b22',
+  card2: '#20242d',
+  border: '#2a2f3a',
+  text: '#e8eaf0',
+  dim: '#8d94a5',
+  accent: '#6ea8fe',
+  accentText: '#0b1220',
+  user: '#2b3a55',
+  danger: '#ff6b6b',
+  ok: '#5ad19a',
+};
+
+export const S = StyleSheet.create({
+  fill: { flex: 1, backgroundColor: C.bg },
+  h1: { color: C.text, fontSize: 24, fontWeight: '700' },
+  h2: { color: C.text, fontSize: 16, fontWeight: '600', marginBottom: 6 },
+  dim: { color: C.dim, fontSize: 13, lineHeight: 18 },
+  text: { color: C.text, fontSize: 15, lineHeight: 21 },
+  card: {
+    backgroundColor: C.card,
+    borderColor: C.border,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 12,
+  },
+  btn: {
+    backgroundColor: C.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  btnText: { color: C.accentText, fontWeight: '700', fontSize: 15 },
+  btn2: {
+    backgroundColor: C.card2,
+    borderColor: C.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  btn2Text: { color: C.text, fontWeight: '600', fontSize: 14 },
+  disabled: { opacity: 0.4 },
+  input: {
+    backgroundColor: C.card2,
+    borderColor: C.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    color: C.text,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14,
+  },
+  row: { flexDirection: 'row', alignItems: 'center' },
+});

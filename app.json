@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Vision Chat",
+    "slug": "vision-chat",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "backgroundColor": "#0f1115",
+    "android": {
+      "package": "com.visionchat.local",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f1115"
+      }
+    },
+    "plugins": [
+      [
+        "llama.rn",
+        {
+          "enableOpenCLAndHexagon": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Камера нужна, чтобы отправлять фото в чат.",
+          "photosPermission": "Доступ к галерее нужен, чтобы отправлять картинки в чат."
+        }
+      ]
+    ],
+    "icon": "./assets/icon.png"
+  }
+}

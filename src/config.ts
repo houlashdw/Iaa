@@ -77,6 +77,24 @@ export type DrawStyle = {
 export const DRAW_STYLES: DrawStyle[] = [
   { id: 'none', title: 'Без стиля', suffix: '', negative: '' },
   {
+    id: 'digital',
+    title: 'Диджитал-арт (планшет)',
+    suffix:
+      'digital painting, digital illustration drawn on a graphics tablet, painterly soft shading, ' +
+      'smooth gradients, airbrush highlights, rim lighting, rich colors, concept art, ' +
+      'trending on artstation, highly detailed',
+    negative: 'photo, 3d render, lowres, blurry, deformed, bad anatomy, bad hands, extra fingers, watermark',
+  },
+  {
+    id: 'digital-anime',
+    title: 'Диджитал аниме-арт',
+    suffix:
+      'digital anime illustration drawn on a graphics tablet, clean lineart, soft digital shading, ' +
+      'smooth gradients, glossy highlights, detailed eyes, vibrant colors, pixiv, artstation, ' +
+      'highly detailed, sharp focus',
+    negative: 'photo, realistic, 3d render, lowres, blurry, bad anatomy, bad hands, extra fingers, watermark',
+  },
+  {
     id: 'anime',
     title: 'Аниме',
     suffix: 'anime style, clean lineart, cel shading, vibrant colors, highly detailed, sharp focus',
@@ -162,5 +180,5 @@ export const DEFAULT_SETTINGS: Settings = {
   sdNegative: 'blurry, low quality, deformed, watermark, text',
   sdSampler: 'auto',
   sdScheduler: 'auto',
-  sdStyle: 'none',
+  sdStyle: 'digital',
 };

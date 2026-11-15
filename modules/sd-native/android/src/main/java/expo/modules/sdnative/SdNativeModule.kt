@@ -25,7 +25,10 @@ class SdNativeModule : Module() {
           num("cfg", 1.0).toFloat(),
           num("seed", -1.0).toLong(),
           num("threads", 4.0).toInt(),
-          (o["out"] as? String) ?: ""
+          (o["out"] as? String) ?: "",
+          (o["sampler"] as? String) ?: "auto",
+          (o["scheduler"] as? String) ?: "auto",
+          (o["filter"] as? String) ?: ""
         )
       } finally {
         SdBridge.listener = null

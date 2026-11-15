@@ -14,6 +14,9 @@ type SdNativeType = {
     seed: number;
     threads: number;
     out: string;
+    sampler: string;
+    scheduler: string;
+    filter: string;
   }): Promise<string>;
   cancel(): void;
   release(): Promise<void>;
@@ -38,6 +41,9 @@ export type DrawOptions = {
   cfg: number;
   threads: number;
   outUri: string;
+  sampler: string;
+  scheduler: string;
+  filter: string;
   onProgress?: (step: number, steps: number) => void;
 };
 
@@ -61,6 +67,9 @@ export async function drawImage(o: DrawOptions): Promise<string> {
       seed: -1,
       threads: o.threads,
       out: strip(o.outUri),
+      sampler: o.sampler,
+      scheduler: o.scheduler,
+      filter: o.filter,
     });
     if (err) throw new Error(err);
     return o.outUri;

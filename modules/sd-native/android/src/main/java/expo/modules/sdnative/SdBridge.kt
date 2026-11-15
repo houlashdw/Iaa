@@ -25,7 +25,10 @@ object SdBridge {
     cfg: Float,
     seed: Long,
     threads: Int,
-    out: String
+    out: String,
+    sampler: String,
+    scheduler: String,
+    filter: String
   ): String
 
   external fun nativeCancel()

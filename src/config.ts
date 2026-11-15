@@ -31,11 +31,99 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-export const SD_PRESET = {
-  title: 'SD-Turbo (Q8): рисует за 4 шага',
-  note: 'Отдельная модель-художник, ~2 ГБ. 512×512 на процессоре примерно 30–90 секунд.',
-  url: 'https://huggingface.co/Green-Sky/SD-Turbo-GGUF/resolve/main/sd_turbo-f16-q8_0.gguf',
+export type SdProfile = {
+  steps: number;
+  size: number;
+  cfg: number;
+  sampler: string;
+  scheduler: string;
 };
+
+export type SdPreset = {
+  id: string;
+  title: string;
+  note: string;
+  url: string;
+  profile: SdProfile;
+};
+
+export const SD_PRESETS: SdPreset[] = [
+  {
+    id: 'sd-turbo',
+    title: 'SD-Turbo (Q8): самый быстрый',
+    note: '~2 ГБ. 4 шага. Быстро, но возможны артефакты (руки, лица, детали).',
+    url: 'https://huggingface.co/Green-Sky/SD-Turbo-GGUF/resolve/main/sd_turbo-f16-q8_0.gguf',
+    profile: { steps: 4, size: 512, cfg: 1.0, sampler: 'auto', scheduler: 'auto' },
+  },
+  {
+    id: 'dreamshaper-lcm',
+    title: 'DreamShaper-7 LCM: качественнее',
+    note:
+      '~2.1 ГБ. 6 шагов, чище детали и лица, лучше с аниме и иллюстрациями. ' +
+      'Лицензия CreativeML OpenRAIL-M.',
+    url: 'https://huggingface.co/darkmaniac7/TokForge-DreamShaper-LCM-GGUF/resolve/main/dreamshaper-7-lcm-f16.gguf',
+    profile: { steps: 6, size: 512, cfg: 1.5, sampler: 'lcm', scheduler: 'lcm' },
+  },
+];
+
+export type DrawStyle = {
+  id: string;
+  title: string;
+  suffix: string;
+  negative: string;
+  filter?: 'pencil';
+};
+
+export const DRAW_STYLES: DrawStyle[] = [
+  { id: 'none', title: 'Без стиля', suffix: '', negative: '' },
+  {
+    id: 'anime',
+    title: 'Аниме',
+    suffix: 'anime style, clean lineart, cel shading, vibrant colors, highly detailed, sharp focus',
+    negative: 'photo, realistic, 3d, lowres, bad anatomy, bad hands, extra fingers',
+  },
+  {
+    id: 'pencil',
+    title: 'Карандаш + штриховка',
+    suffix:
+      'graphite pencil drawing, detailed hatching and cross-hatching shading, soft tonal gradients, ' +
+      'monochrome sketch on paper, fine linework, high detail',
+    negative: 'color, photo, blurry, lowres, deformed',
+    filter: 'pencil',
+  },
+  {
+    id: 'ink',
+    title: 'Тушь / манга',
+    suffix:
+      'black ink illustration, bold linework, stippling and hatching shading, high contrast, ' +
+      'manga style, monochrome',
+    negative: 'color, photo, blurry, lowres, deformed',
+  },
+  {
+    id: 'watercolor',
+    title: 'Акварель',
+    suffix: 'watercolor painting, soft washes, paper texture, delicate gradients, artistic',
+    negative: 'photo, lowres, blurry, deformed',
+  },
+  {
+    id: 'oil',
+    title: 'Масло',
+    suffix: 'oil painting, visible brush strokes, rich colors, dramatic lighting, masterpiece',
+    negative: 'photo, lowres, blurry, deformed',
+  },
+  {
+    id: 'real',
+    title: 'Реализм',
+    suffix: 'photorealistic, natural lighting, 85mm photo, sharp focus, highly detailed',
+    negative: 'cartoon, anime, painting, lowres, blurry, deformed, bad anatomy',
+  },
+  {
+    id: '3d',
+    title: '3D',
+    suffix: '3d render, soft studio lighting, smooth materials, octane render, highly detailed',
+    negative: 'lowres, blurry, deformed, flat',
+  },
+];
 
 export const PROMPT_ENHANCER_SYSTEM =
   'You write prompts for a text-to-image model (Stable Diffusion). ' +
@@ -56,6 +144,9 @@ export type Settings = {
   sdSize: number;
   sdCfg: number;
   sdNegative: string;
+  sdSampler: string;
+  sdScheduler: string;
+  sdStyle: string;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -69,4 +160,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sdSize: 512,
   sdCfg: 1.0,
   sdNegative: 'blurry, low quality, deformed, watermark, text',
+  sdSampler: 'auto',
+  sdScheduler: 'auto',
+  sdStyle: 'none',
 };

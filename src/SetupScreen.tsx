@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { PRESETS, SD_PRESET } from './config';
+import { PRESETS, SD_PRESETS, SdProfile } from './config';
 import {
   DownloadHandle,
   ModelFile,
@@ -32,10 +32,11 @@ type Props = {
   setMmprojFile: (n: string | null) => void;
   setSdFile: (n: string | null) => void;
   refresh: () => Promise<void>;
+  applySdProfile: (p: SdProfile) => void;
   onStart: () => void;
 };
 
-type Job = { kind: 'model' | 'mmproj' | 'sd'; url: string };
+type Job = { kind: 'model' | 'mmproj' | 'sd'; url: string; profile?: SdProfile };
 
 const looksLikeSd = (n: string) => /(^|[-_.])(sd|sdxl|sdxs|stable|turbo|diffusion|flux)/i.test(n);
 
@@ -76,7 +77,10 @@ export default function SetupScreen(p: Props) {
             },
           );
           if (j.kind === 'model') p.setModelFile(name);
-          else if (j.kind === 'sd') p.setSdFile(name);
+          else if (j.kind === 'sd') {
+            p.setSdFile(name);
+            if (j.profile) p.applySdProfile(j.profile);
+          }
           else p.setMmprojFile(name);
         }
         await p.refresh();
@@ -167,17 +171,19 @@ export default function SetupScreen(p: Props) {
           </View>
         ))}
 
-        <View style={{ marginBottom: 12 }}>
-          <Text style={S.text}>🎨 {SD_PRESET.title}</Text>
-          <Text style={S.dim}>{SD_PRESET.note}</Text>
-          <Pressable
-            disabled={!!busy}
-            onPress={() => runJobs([{ kind: 'sd', url: SD_PRESET.url }])}
-            style={[S.btn2, { marginTop: 8 }, busy ? S.disabled : null]}
-          >
-            <Text style={S.btn2Text}>Скачать художника (необязательно)</Text>
-          </Pressable>
-        </View>
+        {SD_PRESETS.map((sp) => (
+          <View key={sp.id} style={{ marginBottom: 12 }}>
+            <Text style={S.text}>🎨 {sp.title}</Text>
+            <Text style={S.dim}>{sp.note}</Text>
+            <Pressable
+              disabled={!!busy}
+              onPress={() => runJobs([{ kind: 'sd', url: sp.url, profile: sp.profile }])}
+              style={[S.btn2, { marginTop: 8 }, busy ? S.disabled : null]}
+            >
+              <Text style={S.btn2Text}>Скачать художника (необязательно)</Text>
+            </Pressable>
+          </View>
+        ))}
 
         <Text style={[S.dim, { marginTop: 4 }]}>Или свои ссылки на .gguf (Hugging Face):</Text>
         <TextInput

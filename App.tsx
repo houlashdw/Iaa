@@ -68,6 +68,16 @@ function Root() {
           setMmprojFile={setMmprojFile}
           setSdFile={setSdFile}
           refresh={refresh}
+          applySdProfile={(pr) =>
+            setSettings((cur) => ({
+              ...cur,
+              sdSteps: pr.steps,
+              sdSize: pr.size,
+              sdCfg: pr.cfg,
+              sdSampler: pr.sampler,
+              sdScheduler: pr.scheduler,
+            }))
+          }
           onStart={() => setScreen('chat')}
         />
       ) : model && proj ? (

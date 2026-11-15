@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { DEFAULT_SETTINGS, Settings } from './config';
+import { DEFAULT_SETTINGS, SD_PRESETS, Settings } from './config';
 import { C, S } from './theme';
 
 type Props = {
@@ -27,8 +27,16 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
   const [sdSize, setSdSize] = useState(String(settings.sdSize));
   const [sdCfg, setSdCfg] = useState(String(settings.sdCfg));
   const [sdNeg, setSdNeg] = useState(settings.sdNegative);
+  const [sdSampler, setSdSampler] = useState(settings.sdSampler);
+  const [sdSched, setSdSched] = useState(settings.sdScheduler);
 
-  const field = (label: string, hint: string, v: string, set: (s: string) => void) => (
+  const field = (
+    label: string,
+    hint: string,
+    v: string,
+    set: (s: string) => void,
+    textual = false,
+  ) => (
     <View style={{ marginTop: 12 }}>
       <Text style={S.text}>{label}</Text>
       <Text style={S.dim}>{hint}</Text>
@@ -36,7 +44,8 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
         style={[S.input, { marginTop: 4 }]}
         value={v}
         onChangeText={set}
-        keyboardType="decimal-pad"
+        keyboardType={textual ? 'default' : 'decimal-pad'}
+        autoCapitalize="none"
       />
     </View>
   );
@@ -53,6 +62,9 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
       sdSize: Math.round(num(sdSize, DEFAULT_SETTINGS.sdSize, 256, 1024) / 64) * 64,
       sdCfg: num(sdCfg, DEFAULT_SETTINGS.sdCfg, 0, 15),
       sdNegative: sdNeg,
+      sdSampler: sdSampler.trim() || 'auto',
+      sdScheduler: sdSched.trim() || 'auto',
+      sdStyle: settings.sdStyle,
     });
   };
 
@@ -92,6 +104,26 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
           setImg,
         )}
         <Text style={[S.h2, { marginTop: 24 }]}>Рисование</Text>
+        <Text style={S.dim}>Быстрая настройка под модель-художник:</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
+          {SD_PRESETS.map((pr) => (
+            <Pressable
+              key={pr.id}
+              style={[S.btn2, { marginRight: 8, marginBottom: 8 }]}
+              onPress={() => {
+                setSdSteps(String(pr.profile.steps));
+                setSdSize(String(pr.profile.size));
+                setSdCfg(String(pr.profile.cfg));
+                setSdSampler(pr.profile.sampler);
+                setSdSched(pr.profile.scheduler);
+              }}
+            >
+              <Text style={S.btn2Text}>{pr.title.split(':')[0]}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {field('Сэмплер', 'auto, lcm, euler_a, euler, dpm++2m. Для LCM-модели ставь lcm', sdSampler, setSdSampler, true)}
+        {field('Планировщик', 'auto или lcm, karras, discrete…', sdSched, setSdSched, true)}
         {field('Размер картинки (px)', '256–1024, кратно 64. 512 = быстро, 768+ = очень долго', sdSize, setSdSize)}
         {field('Шаги', 'Для SD-Turbo 1–4. Больше шагов = дольше', sdSteps, setSdSteps)}
         {field('CFG (следование описанию)', 'Для SD-Turbo 1.0. Для обычных SD 1.5 — 6–8', sdCfg, setSdCfg)}

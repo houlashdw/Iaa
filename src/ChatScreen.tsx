@@ -6,6 +6,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
@@ -15,7 +16,7 @@ import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as FS from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { PROMPT_ENHANCER_SYSTEM, Settings } from './config';
+import { DRAW_STYLES, PROMPT_ENHANCER_SYSTEM, Settings } from './config';
 import {
   ChatMsg,
   ensureLoaded,
@@ -211,23 +212,29 @@ export default function ChatScreen(p: Props) {
         const cleaned = r.text.replace(/^["'\s]+|["'\s]+$/g, '');
         if (cleaned) prompt = cleaned;
       }
-      patch((m) => ({ ...m, text: `🎨 ${prompt}` }));
+      const style = DRAW_STYLES.find((x) => x.id === p.settings.sdStyle) ?? DRAW_STYLES[0];
+      const finalPrompt = style.suffix ? `${prompt}, ${style.suffix}` : prompt;
+      const negative = [p.settings.sdNegative, style.negative].filter(Boolean).join(', ');
+      patch((m) => ({ ...m, text: `🎨 ${finalPrompt}` }));
       setStatus('Освобождаю память…');
       await unloadModel();
       setStatus('Загружаю художника…');
       const out = `${FS.cacheDirectory}gen-${Date.now()}.png`;
       await drawImage({
         modelUri: p.sdUri as string,
-        prompt,
-        negative: p.settings.sdNegative,
+        prompt: finalPrompt,
+        negative,
         size: p.settings.sdSize,
         steps: p.settings.sdSteps,
         cfg: p.settings.sdCfg,
         threads: p.settings.nThreads,
         outUri: out,
+        sampler: p.settings.sdSampler,
+        scheduler: p.settings.sdScheduler,
+        filter: style.filter ?? '',
         onProgress: (step, steps) => setStatus(`Рисую: шаг ${step} из ${steps}…`),
       });
-      patch((m) => ({ ...m, text: `🎨 ${prompt}`, images: [out], generated: true }));
+      patch((m) => ({ ...m, text: `🎨 ${finalPrompt}`, images: [out], generated: true }));
     } catch (e: any) {
       patch((m) => ({ ...m, text: `⚠️ ${String(e?.message ?? e)}` }));
     } finally {
@@ -394,6 +401,27 @@ export default function ChatScreen(p: Props) {
                 Если выключено, пиши описание по-английски.
               </Text>
             </Pressable>
+          ) : null}
+          {drawMode ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: 6 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {DRAW_STYLES.map((st) => {
+                const on = p.settings.sdStyle === st.id;
+                return (
+                  <Pressable
+                    key={st.id}
+                    onPress={() => p.onSettingsChange({ ...p.settings, sdStyle: st.id })}
+                    style={[S.btn2, { marginRight: 6, paddingVertical: 6 }, on ? { borderColor: C.accent } : null]}
+                  >
+                    <Text style={[S.btn2Text, on ? { color: C.accent } : null]}>{st.title}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           ) : null}
           {pending.length > 0 ? (
             <View style={{ flexDirection: 'row', marginBottom: 6 }}>

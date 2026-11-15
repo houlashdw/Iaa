@@ -8,6 +8,7 @@
 #include <mutex>
 #include <string>
 
+#include "sd_filters.h"
 #include "stable-diffusion.h"
 
 #define STB_IMAGE_WRITE_STATIC
@@ -80,7 +81,8 @@ extern "C" {
 
 JNIEXPORT jstring JNICALL Java_expo_modules_sdnative_SdBridge_nativeGenerate(
     JNIEnv* env, jobject thiz, jstring jModel, jstring jPrompt, jstring jNegative, jint width,
-    jint height, jint steps, jfloat cfg, jlong seed, jint threads, jstring jOut) {
+    jint height, jint steps, jfloat cfg, jlong seed, jint threads, jstring jOut, jstring jSampler,
+    jstring jScheduler, jstring jFilter) {
   std::lock_guard<std::mutex> lock(g_mutex);
 
   env->GetJavaVM(&g_vm);
@@ -92,6 +94,9 @@ JNIEXPORT jstring JNICALL Java_expo_modules_sdnative_SdBridge_nativeGenerate(
   const std::string prompt = to_str(env, jPrompt);
   const std::string negative = to_str(env, jNegative);
   const std::string out = to_str(env, jOut);
+  const std::string sampler = to_str(env, jSampler);
+  const std::string scheduler = to_str(env, jScheduler);
+  const std::string filter = to_str(env, jFilter);
 
   g_last_error.clear();
   sd_set_log_callback(log_cb, nullptr);
@@ -127,7 +132,15 @@ JNIEXPORT jstring JNICALL Java_expo_modules_sdnative_SdBridge_nativeGenerate(
   gp.sample_params.sample_steps = steps;
   gp.sample_params.guidance.txt_cfg = cfg;
   gp.sample_params.sample_method = sd_get_default_sample_method(g_ctx);
+  if (!sampler.empty() && sampler != "auto") {
+    enum sample_method_t m = str_to_sample_method(sampler.c_str());
+    if (m != SAMPLE_METHOD_COUNT) gp.sample_params.sample_method = m;
+  }
   gp.sample_params.scheduler = sd_get_default_scheduler(g_ctx, gp.sample_params.sample_method);
+  if (!scheduler.empty() && scheduler != "auto") {
+    enum scheduler_t sc = str_to_scheduler(scheduler.c_str());
+    if (sc != SCHEDULER_COUNT) gp.sample_params.scheduler = sc;
+  }
   gp.vae_tiling_params.enabled = true;  // экономит память при декодировании
 
   sd_image_generation_result_t* result = nullptr;
@@ -139,7 +152,10 @@ JNIEXPORT jstring JNICALL Java_expo_modules_sdnative_SdBridge_nativeGenerate(
     return env->NewStringUTF(msg.c_str());
   }
 
-  const sd_image_t& im = result->items[0].image;
+  sd_image_t& im = result->items[0].image;
+  if (filter == "pencil" && im.channel >= 3) {
+    sdfilters::pencil_sketch(im.data, (int)im.width, (int)im.height, (int)im.channel);
+  }
   int wrote = stbi_write_png(out.c_str(), (int)im.width, (int)im.height, (int)im.channel, im.data,
                              (int)(im.width * im.channel));
   free_sd_image_generation_result(result);

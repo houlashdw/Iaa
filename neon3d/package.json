@@ -1,0 +1,9 @@
+{
+  "name": "neon3d",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Neon 3D — procedural anime wolf-girl pop loop (Three.js, no external assets)",
+  "scripts": { "build": "node build.mjs" },
+  "devDependencies": { "esbuild": "^0.25.0", "three": "^0.180.0" }
+}

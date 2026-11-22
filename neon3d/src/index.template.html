@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Neon 3D · wolf-girl pop loop</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  html,body{margin:0;height:100%;background:#120e18;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  #stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  canvas#c{width:min(100vw,177.78vh);height:min(56.25vw,100vh);display:block;touch-action:none;cursor:pointer}
+  #ui{position:absolute;right:14px;bottom:14px;display:flex;gap:8px;z-index:2}
+  #ui button{all:unset;cursor:pointer;color:#fff;background:rgba(27,21,34,.72);border:2px solid #e8254f;border-radius:999px;padding:7px 14px;font-size:14px;font-weight:700;backdrop-filter:blur(4px);transition:transform .12s}
+  #ui button:hover{transform:scale(1.07)} #ui button.on{background:#e8254f}
+  #hint{position:absolute;left:14px;bottom:14px;color:#fff;font-size:13px;line-height:1.5;opacity:.85;pointer-events:none;text-shadow:0 1px 3px #000;transition:opacity 1.2s}
+  #hint b{color:#ff8fb0}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c"></canvas></div>
+<div id="hint"><b>Space</b> — пауза · <b>M</b> — музыка · <b>F</b> — на весь экран<br>двигай мышью — она следит · клик — сердечки</div>
+<div id="ui"><button id="bSnd">🔊 Звук</button><button id="bPause">⏸ Пауза</button><button id="bFs">⛶</button></div>
+<script>/*BUNDLE*/</script>
+</body>
+</html>

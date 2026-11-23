@@ -36,17 +36,22 @@ for (const sc of S) {
   await page.goto(url);
   await page.waitForFunction('window.__G && window.__G.title && window.__G.mode==="title"', null, { timeout: 60000 });
   await page.evaluate(`__G.gfx.setQuality('low')`);
-  await page.evaluate(`__G.cheat=${JSON.stringify(sc.cheat || { hp: 40, atk: 40 })}`);
+  await page.evaluate(`__G.cheat=${JSON.stringify({ auto: true, ...(sc.cheat || { hp: 40, atk: 40 }) })}; __G.speed=${sc.speed || 10}`);
   await page.evaluate(sc.setup);
   await page.waitForTimeout(2500);
   await page.evaluate(`window.__auto=setInterval(()=>{try{__G.input._dispatch('ok')}catch(e){}},90)`);
   await page.evaluate(sc.then);
   let ok = false; const limit = (sc.wait || 90) * 1000;
-  while (Date.now() - t0 < limit) { if (await page.evaluate(sc.done).catch(() => false)) { ok = true; break; } await page.waitForTimeout(500); }
+  let lastDbg = 0;
+  while (Date.now() - t0 < limit) {
+    if (await page.evaluate(sc.done).catch(() => false)) { ok = true; break; }
+    if (process.env.DBG && Date.now() - lastDbg > 10000) { lastDbg = Date.now(); console.log('   ..', ((Date.now() - t0) / 1000).toFixed(0) + 's', await page.evaluate(`(()=>{const F=__G.field,cb=F.combat;return JSON.stringify({sc:!!cb.scripted,eng:cb.engaged,modal:__G.input.modal,tele:cb.vfx.tele.length,party:cb.party.map(x=>[x.name,Math.round(x.hp),+x.actor.position.x.toFixed(1),+x.actor.position.z.toFixed(1),x.act&&x.act.type,+x.thinkCd.toFixed(1),x.stuckTot&&+x.stuckTot.toFixed(1),x.actor.moving,x.hitstun,x.stun,x.actor.ai]),foes:cb.mobs.map(m=>[m.alive,Math.round(m.hp),+m.actor.position.x.toFixed(1),+m.actor.position.z.toFixed(1),m.act&&m.act.type,m.engaged]),t:+cb.time.toFixed(1)})})()`).catch((e) => String(e))); }
+    await page.waitForTimeout(500);
+  }
   const flags = await page.evaluate(`JSON.stringify({mode:__G.mode, map:__G.field.def&&__G.field.def.id, lv:__G.state.roster.haru&&__G.state.roster.haru.lv, busy:__G.field.busy})`).catch(() => '?');
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${sc.name.padEnd(16)} ${((Date.now() - t0) / 1000).toFixed(0).padStart(3)}s  ${flags}${errs.length ? '  ERRORS: ' + [...new Set(errs)].slice(0, 3).join(' | ') : ''}`);
   if (!ok || errs.length) fails++;
-  if (!ok) await page.screenshot({ path: `/tmp/story_fail_${sc.name}.png` });
+  if (!ok) { await page.screenshot({ path: `/tmp/story_fail_${sc.name}.png` }); console.log('   state:', await page.evaluate(`(()=>{const F=__G.field,cb=F.combat;return JSON.stringify({scripted:!!cb.scripted,engaged:cb.engaged,modal:__G.input.modal,ev:cb.eventBusy,res:cb.resultBusy,party:cb.party.map(x=>[x.name,Math.round(x.hp),+x.actor.position.x.toFixed(1),+x.actor.position.z.toFixed(1),x.act&&x.act.type]),foes:cb.mobs.map(m=>[m.name,m.alive,Math.round(m.hp),+m.actor.position.x.toFixed(1),+m.actor.position.z.toFixed(1),m.act&&m.act.type,m.engaged]),time:+cb.time.toFixed(1)})})()`).catch((e) => String(e))); }
   await page.close();
 }
 await browser.close();

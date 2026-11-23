@@ -7,6 +7,7 @@ import { h, root, esc, bar, pick, toast } from './ui.js';
 import { audio } from '../core/audio.js';
 import { input } from '../core/input.js';
 import { ptImg } from './portraits.js';
+import { CONTROLS_HTML } from './help.js';
 import { sleep } from '../core/util.js';
 
 const STAT_NAMES = [['maxHp', 'HP'], ['maxMp', 'MP'], ['atk', 'ATK'], ['def', 'DEF'], ['mag', 'MAG'], ['res', 'RES'], ['spd', 'SPD']];
@@ -38,7 +39,7 @@ export class Menus {
         <div class="mbody"><div class="mleft panel"></div><div class="mright"></div></div>`;
       const left = el.querySelector('.mleft'), right = el.querySelector('.mright');
       right.innerHTML = state.party.slice(0, 4).map((id) => card(id)).join('');
-      const opts = [['Party', 'party'], ['Items', 'items'], ['Equipment', 'equip'], ['Status & Skills', 'status'], ['Save', 'save'], ['Settings', 'settings'], ['Quit to Title', 'quit']];
+      const opts = [['Party', 'party'], ['Items', 'items'], ['Equipment', 'equip'], ['Status & Skills', 'status'], ['Save', 'save'], ['Settings', 'settings'], ['Controls', 'controls'], ['Quit to Title', 'quit']];
       const rows = opts.map(([t]) => { const r = h('div', 'row', esc(t)); left.appendChild(r); return r; });
       const i = await pick(rows, { start: last });
       if (i === null) break;
@@ -50,6 +51,7 @@ export class Menus {
       else if (k === 'status') await this.statusMenu(el);
       else if (k === 'save') await this.saveMenu(el);
       else if (k === 'settings') await this.settingsMenu(el);
+      else if (k === 'controls') await this.controlsMenu(el);
       else if (k === 'quit') { if (await this.confirm(el, 'Return to the title screen? Unsaved progress will be lost.')) { el.remove(); G.paused = false; await G.toTitle(); return; } }
     }
     el.remove();
@@ -98,11 +100,11 @@ export class Menus {
       right.innerHTML = `<div class="panel ipanel"><div class="ptitle">Items</div><div class="list"></div><div class="desc"></div></div>`;
       const lst = right.querySelector('.list'), desc = right.querySelector('.desc');
       if (!ids.length) { desc.textContent = 'You are carrying no items.'; await sleep(700); return; }
-      const rows = ids.map((id) => { const it = ITEMS[id]; const r = h('div', 'row', `<span>${it.key ? '🗝 ' : ''}${esc(it.name)}</span><span class="r">×${count(id)}</span>`); if (it.key || it.battleOnly) r.classList.add('off'); lst.appendChild(r); return r; });
+      const rows = ids.map((id) => { const it = ITEMS[id]; const r = h('div', 'row', `<span>${it.key ? '🗝 ' : ''}${esc(it.name)}</span><span class="r">×${count(id)}</span>`); if (it.key || (it.battleOnly && !this.G.field.combat.engaged)) r.classList.add('off'); lst.appendChild(r); return r; });
       const i = await pick(rows, { onFocus: (k) => (desc.textContent = ITEMS[ids[k]].desc) });
       if (i === null) return;
       const id = ids[i], it = ITEMS[id];
-      const mode = it.kind === 'revive';
+      if (it.battleOnly) { if (this.G.field.combat.useBattleItem(id)) { audio.sfx('revive', { vol: 0.6 }); } continue; }
       const m = await this.chooseMember(el, `Use ${it.name} on…`);
       if (!m) continue;
       const r = state.roster[m], s = statsOf(m);
@@ -195,6 +197,12 @@ export class Menus {
   }
 
   // =============================================================== settings
+  async controlsMenu(el) {
+    const right = el.querySelector('.mright');
+    right.innerHTML = `<div class="panel ipanel"><div class="ptitle">Controls</div><div class="desc" style="line-height:1.9;font-size:15px">${CONTROLS_HTML}</div><div class="list"></div></div>`;
+    const row = h('div', 'row', 'Back'); right.querySelector('.list').appendChild(row);
+    await pick([row]);
+  }
   async settingsMenu(el) {
     const G = this.G;
     const right = el.querySelector('.mright');

@@ -8,10 +8,10 @@ import { input } from './core/input.js';
 import { audio } from './core/audio.js';
 import { World } from './world/world.js';
 import { Field } from './world/field.js';
-import { Battle, BattleAbort } from './battle/battle.js';
 import { Menus } from './ui/menus.js';
 import { Title } from './ui/title.js';
 import * as UI from './ui/ui.js';
+import { CONTROLS_HTML } from './ui/help.js';
 import { state, resetState, addChar, setFlag, flag, addItem, healAll, saveSlot, loadSlot, statsOf } from './state.js';
 import { CHARS } from './data/characters.js';
 import { itemInfo } from './data/items.js';
@@ -51,7 +51,7 @@ G.join = async (id, o = {}) => {
   if (G.field && G.field.active) G.field.buildParty(G.field.pos.x, G.field.pos.z, G.field.dir);
 };
 G.heal = () => { healAll(); audio.sfx('revive', { vol: 0.7 }); };
-G.shake = (n = 0.5) => { (G.mode === 'battle' ? G.battle.world : G.world).shake = n; };
+G.shake = (n = 0.5) => { G.world.shake = n; };
 G.flash = async (ms = 500, color = 0xffffff) => { G.gfx.setFadeColor(color); G.gfx.fade = 0.95; await tween(ms, (t) => (G.gfx.fade = 0.95 * (1 - t))); G.gfx.fade = 0; G.gfx.setFadeColor(0x000000); };
 G.music = (name) => audio.playMusic(name);
 G.sfx = (n, o) => audio.sfx(n, o);
@@ -72,27 +72,18 @@ G.inn = async (price, name = 'Inn') => {
   return true;
 };
 
-// ---------------------------------------------------------------- battles
-G.battleTransition = async (prepare) => {
-  audio.stopMusic(0.2);
-  audio.sfx('boss', { vol: 0.5, rate: 1.6 });
-  G.gfx.setFadeColor(0xffffff);
-  await tween(260, (t) => (G.gfx.fade = t));
-  await prepare();
-  G.mode = 'battle';
+// ---------------------------------------------------------------- controls help
+G.showControls = (ms = 15000) => {
+  if (matchMedia('(pointer: coarse)').matches) return;
+  const el = UI.h('div', 'ctrlhelp', CONTROLS_HTML);
+  UI.root.appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity .8s'; el.style.opacity = 0; setTimeout(() => el.remove(), 900); }, ms);
 };
-G.startBattle = async (opts) => {
-  UI.dialogue.hide();
-  try {
-    const r = await G.battle.run(opts);
-    G.mode = 'field';
-    return r;
-  } catch (e) {
-    if (e instanceof BattleAbort) return 'abort';
-    throw e;
-  }
-};
-G.bossBattle = (enemies, o = {}) => G.startBattle({ enemies, stage: o.stage || G.field.def.stage || 'field', canFlee: false, music: o.music || 'boss_theme', events: o.events || [], ...o });
+
+// ---------------------------------------------------------------- battles (real-time, inside the field)
+/** story fight: spawns the foes around the party and resolves 'victory' | 'abort' once the fight is over */
+G.startBattle = (opts) => G.field.combat.fight(opts);
+G.bossBattle = (enemies, o = {}) => G.startBattle({ enemies, canFlee: false, music: o.music || 'boss_theme', events: o.events || [], ...o });
 
 // ---------------------------------------------------------------- settings / save
 G.saveSettings = () => {
@@ -110,7 +101,7 @@ G.toTitle = async () => {
   G.mode = 'title'; G.field.active = false;
   await G.fadeTo(1, 400);
   UI.dialogue.hide();
-  G.battle.el.classList.add('hidden'); G.battle.active = false;
+  G.field.combat.clearAll(); G.field.combat.hud.show(false);
   audio.stopMusic(0.5);
   await G.fadeTo(0, 400);
   G.title.show();
@@ -154,6 +145,7 @@ export async function boot() {
   const canvas = document.getElementById('gl');
   G.gfx = new Gfx(canvas);
   G.loadSettings();
+  input.mountMouse(canvas);
   if (matchMedia('(pointer: coarse)').matches) input.mountTouch(UI.root);
   let man;
   if (window.__EMBED__) man = JSON.parse(atob(window.__EMBED__['manifest.json'].split(',')[1]));
@@ -162,8 +154,8 @@ export async function boot() {
   await preload(man, (p) => (fill.style.width = Math.round(p * 100) + '%'));
   initPortraits(G.gfx);
   G.world = new World(G.gfx);
+  G.world.thirdDefault = true;
   G.field = new Field(G);
-  G.battle = new Battle(G);
   G.menus = new Menus(G);
   G.title = new Title(G);
   G.menus.loadPicker = async () => {
@@ -179,8 +171,7 @@ export async function boot() {
   let last = performance.now();
   const frame = (now) => {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (G.mode === 'field') G.field.update(dt);
-    else if (G.mode === 'battle') G.battle.update(dt);
+    if (G.mode === 'field') { for (let i = 0, n = G.speed || 1; i < n; i++) G.field.update(i ? 0.05 : dt); }
     else if (G.mode === 'title') G.title.update(dt);
     G.gfx.render();
     requestAnimationFrame(frame);

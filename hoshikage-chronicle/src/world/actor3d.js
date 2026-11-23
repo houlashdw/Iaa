@@ -31,6 +31,7 @@ export class Actor3D {
     const inst = instantiate(tpl, { lowFx: gfxOptions.lowFx });
     this.model = inst.model; this.mats = inst.mats;
     const sc = (height * (spec.hMul || 1)) / tpl.height;
+    this.model.rotation.order = 'YXZ';
     this.model.scale.set(sc * (spec.wMul || 1), sc, sc * (spec.wMul || 1));
     this.model.position.y = -tpl.minY * sc;
     this.mesh.add(this.model);
@@ -119,8 +120,8 @@ export class Actor3D {
   faceVec(dx, dz) { if (Math.abs(dx) + Math.abs(dz) > 1e-4) this.facingYaw = Math.atan2(dx, dz); }
   setTint(c) { this.baseTint.set(c); }
   setTexKey() {}
-  attack() { this.attackT = 0.001; if (this.act && this.act.attack) { this.act.attack.reset().play(); setTimeout(() => this.cur && this.cur.play(), 0); } }
-  cast() { this.castT = 0.9; }
+  attack(d = 0.42) { this.attackT = 0.001; this.attackDur = d; if (this.act && this.act.attack) { this.act.attack.reset().play(); setTimeout(() => this.cur && this.cur.play(), 0); } }
+  cast() { this.castT = 0.7; this.castDur = 0.7; }
   hit() { this.hitT = 0.4; if (this.act && this.act.hit) this.act.hit.reset().play(); }
   /** proxy used by battle code to fade enemies out */
   get mat() {
@@ -141,11 +142,13 @@ export class Actor3D {
     this.t += dt; const t = this.t;
     // smooth turning
     this.yaw += wrap(this.facingYaw - this.yaw) * Math.min(1, dt * 12);
-    this.model.rotation.y = this.yaw + (this.tpl.isVrm ? Math.PI : 0) * 0 ;
+    // yaw + (dodge roll: tuck and lean forward); all three components are set so a template's baked rotation can't leak in
+    this.model.rotation.set((this.roll || 0) * 1.1, this.yaw, 0);
+    this.mesh.scale.y = 1 - (this.roll || 0) * 0.28;
     this.walkBlend += ((this.moving ? 1 : 0) - this.walkBlend) * Math.min(1, dt * 10);
-    if (this.moving) this.walkPhase += dt * 9.5;
+    if (this.moving) this.walkPhase += dt * (this.running ? 12.5 : 9.5);
     const w = this.walkBlend;
-    if (this.tpl.isVrm) this._poseVrm(t, w); else this._poseMixer(dt);
+    if (this.tpl.isVrm) this._poseVrm(t, w, dt); else this._poseMixer(dt);
     // bob / hop
     this.bob.position.y = (this.moving ? Math.abs(Math.sin(this.walkPhase)) * 0.035 * (this.height / 1.8) : 0) + this.hop;
     // tint, flash, alpha
@@ -165,22 +168,22 @@ export class Actor3D {
     this._play(moving ? 'walk' : 'idle');
     this.mixer.update(dt);
   }
-  _poseVrm(t, w) {
+  _poseVrm(t, w, dt = 1 / 60) {
     const arm = 1.18; // lower the T-pose arms
     const sw = Math.sin(this.walkPhase) * w;
     const br = Math.sin(t * 2.1) * (1 - w);
     // attack / cast / hit overlays
     let atk = 0, cast = 0, hit = 0;
-    if (this.attackT > 0) { this.attackT += 1 / 60; const k = this.attackT / 0.55; atk = k < 1 ? Math.sin(k * Math.PI) : 0; if (k >= 1) this.attackT = 0; }
-    if (this.castT > 0) { this.castT -= 1 / 60; cast = Math.min(1, Math.sin(Math.min(1, (0.9 - this.castT) / 0.9) * Math.PI) * 1.4); }
-    if (this.hitT > 0) { this.hitT -= 1 / 60; hit = Math.sin(Math.max(0, this.hitT / 0.4) * Math.PI); }
+    if (this.attackT > 0) { this.attackT += dt; const k = this.attackT / (this.attackDur || 0.42); atk = k < 1 ? Math.sin(k * Math.PI) : 0; if (k >= 1) this.attackT = 0; }
+    if (this.castT > 0) { this.castT -= dt; const cd = this.castDur || 0.9; cast = Math.min(1, Math.sin(Math.min(1, (cd - this.castT) / cd) * Math.PI) * 1.4); }
+    if (this.hitT > 0) { this.hitT -= dt; hit = Math.sin(Math.max(0, this.hitT / 0.4) * Math.PI); }
     this._bone('hips', 0, 0, 0);
     this._bone('spine', 0.03 * br - 0.12 * atk * 0 + 0.25 * hit, atk * 0.5 * 0, 0);
-    this._bone('chest', 0.02 * br, -atk * 0.6, 0);
+    this._bone('chest', 0.02 * br + atk * 0.18, -atk * 0.9, 0);
     this._bone('head', -0.04 * br - 0.2 * hit, 0, 0);
     // arms: rest pose lowered, swing opposite to legs
     this._bone('leftUpperArm', -sw * 0.7 * 0 + (-0.1 - atk * 0.2) * 0, 0, arm - cast * 2.3 + 0.04 * br);
-    this._bone('rightUpperArm', 0, 0, -arm + cast * 2.3 - 0.04 * br);
+    this._bone('rightUpperArm', -atk * 0.9, -atk * 1.1, -arm + cast * 2.3 + atk * 1.9 - 0.04 * br);
     this._bone('leftLowerArm', 0, 0, 0.12 * (1 - cast));
     this._bone('rightLowerArm', 0, 0, -0.12 * (1 - cast));
     // legs

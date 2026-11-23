@@ -32,6 +32,10 @@ export class World {
     this.mapGroup = null;
     this.builder = null;
     this.pitch = 0.76; this.dist = 14.5; this.yaw = 0; this.lookUp = 0;
+    this.thirdDefault = false;      // field worlds: third-person orbit camera; the title screen keeps the cinematic orbit
+    this.third = false;
+    this.camDist = 6;               // collision-adjusted distance actually used
+    this.zoomK = 1;                 // player zoom (mouse wheel)
     this.focus = new THREE.Vector3();
     this.camTarget = new THREE.Vector3();
     this.mood = MOODS.day;
@@ -75,7 +79,15 @@ export class World {
   async load(def) {
     if (this.mapGroup) { this.scene.remove(this.mapGroup); this._dispose(this.mapGroup); }
     this.setMood(def.mood || 'day');
-    this.pitch = def.pitch || 0.76; this.dist = def.dist || 14.5; this.lookUp = 0; this.yaw = 0;
+    this.third = this.thirdDefault && def.third !== false;
+    if (this.third) {
+      const indoor = (def.mood || 'day') === 'indoor';
+      this.pitch = def.tpPitch ?? (indoor ? 0.44 : 0.34); this.dist = def.tpDist ?? (indoor ? 4.8 : 7.0);
+      this.camera.fov = 56;
+      this.baseCam = { pitch: this.pitch, dist: this.dist };
+    } else { this.pitch = def.pitch || 0.76; this.dist = def.dist || 14.5; this.camera.fov = 30; }
+    this.camera.updateProjectionMatrix();
+    this.lookUp = 0; this.yaw = 0; this.zoomK = 1;
     const b = new MapBuilder(def);
     def.build(b);
     await b.finalize();
@@ -86,6 +98,19 @@ export class World {
   }
   _dispose(g) {
     g.traverse((o) => { if (o.geometry && !o.isInstancedMesh) o.geometry.dispose(); });
+  }
+  /** how far the third-person camera can back away from (x,y,z) along (dx,dy,dz) before it would sit inside a wall / tree */
+  _clearDist(x, y, z, dx, dy, dz, want) {
+    const b = this.builder;
+    if (!b || !b.hgt) return want;
+    const MIN = 1.6;
+    for (let t = 0.5; t <= want; t += 0.35) {
+      const px = x + dx * t, py = y + dy * t, pz = z + dz * t;
+      const cx = Math.floor(px), cz = Math.floor(pz);
+      if (cx < 0 || cz < 0 || cx >= b.w || cz >= b.h) continue;
+      if (b.hgt[cz * b.w + cx] > py - 0.2) return Math.max(MIN, t - 0.45);
+    }
+    return want;
   }
   add(o) { this.scene.add(o); }
   remove(o) { this.scene.remove(o); }
@@ -111,15 +136,27 @@ export class World {
       });
     }
     // camera
-    this.camTarget.x = damp(this.camTarget.x, this.focus.x, 6, dt);
-    this.camTarget.y = damp(this.camTarget.y, this.focus.y, 6, dt);
-    this.camTarget.z = damp(this.camTarget.z, this.focus.z, 6, dt);
-    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    const k = this.third ? 14 : 6;
+    this.camTarget.x = damp(this.camTarget.x, this.focus.x, k, dt);
+    this.camTarget.y = damp(this.camTarget.y, this.focus.y, k, dt);
+    this.camTarget.z = damp(this.camTarget.z, this.focus.z, k, dt);
     const sx = this.shake > 0 ? (Math.random() - 0.5) * this.shake : 0;
     const sy = this.shake > 0 ? (Math.random() - 0.5) * this.shake : 0;
     this.shake = Math.max(0, this.shake - dt * 2.5);
-    this.camera.position.set(this.camTarget.x + sx + Math.sin(this.yaw) * cp * this.dist, this.camTarget.y + sp * this.dist + sy, this.camTarget.z + Math.cos(this.yaw) * cp * this.dist);
-    this.camera.lookAt(this.camTarget.x, this.camTarget.y + 0.9 + this.lookUp, this.camTarget.z);
+    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    if (this.third) {
+      // third-person: orbit around the character's shoulders; pull in when a wall / tree is in the way
+      const th = this.camTarget.y + 1.45;
+      const dx = Math.sin(this.yaw) * cp, dy = sp, dz = Math.cos(this.yaw) * cp;
+      const want = this.dist * this.zoomK;
+      const free = this._clearDist(this.camTarget.x, th, this.camTarget.z, dx, dy, dz, want);
+      this.camDist = free < this.camDist ? free : damp(this.camDist, free, 5, dt);
+      this.camera.position.set(this.camTarget.x + dx * this.camDist + sx, th + dy * this.camDist + sy, this.camTarget.z + dz * this.camDist);
+      this.camera.lookAt(this.camTarget.x, th + 0.12 + this.lookUp - sp * 0.6, this.camTarget.z);
+    } else {
+      this.camera.position.set(this.camTarget.x + sx + Math.sin(this.yaw) * cp * this.dist, this.camTarget.y + sp * this.dist + sy, this.camTarget.z + Math.cos(this.yaw) * cp * this.dist);
+      this.camera.lookAt(this.camTarget.x, this.camTarget.y + 0.9 + this.lookUp, this.camTarget.z);
+    }
     if (this.sky) this.sky.position.set(this.camera.position.x, 0, this.camera.position.z);
     // sun follows the focus so the shadow box stays on screen
     this.sun.position.copy(this.camTarget).addScaledVector(this.sunDir, 36);

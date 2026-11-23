@@ -1,4 +1,4 @@
-// Exploration mode: walking, collision, NPCs, chests, exits, triggers and random encounters.
+// Exploration mode: third-person free movement, collision, NPCs, chests, exits, triggers; hosts the real-time combat layer.
 import * as THREE from 'three';
 import { Actor3D as Actor } from './actor3d.js';
 import { model } from '../core/assets.js';
@@ -9,12 +9,18 @@ import { state, flag, setFlag, addItem } from '../state.js';
 import { CHARS } from '../data/characters.js';
 import { MAPS } from '../data/maps.js';
 import { ZONES } from '../data/enemies.js';
-import { rand, clamp, tween, easeInOut } from '../core/util.js';
+import { rand, clamp, tween, easeInOut, damp } from '../core/util.js';
+import { Combat } from '../combat/combat.js';
 import { h, root } from '../ui/ui.js';
 import { itemInfo } from '../data/items.js';
 
 const PR = 0.27; // player radius
 const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+/** camera yaw that looks along a compass direction ('up' = toward -z) */
+const yawOfDir = (d) => ({ up: 0, down: Math.PI, left: Math.PI / 2, right: -Math.PI / 2 }[d] ?? 0);
+/** nearest compass direction of a facing yaw (actor yaw 0 faces +z) */
+const dirOfYaw = (y) => { const x = Math.sin(y), z = Math.cos(y); return Math.abs(x) > Math.abs(z) ? (x > 0 ? 'right' : 'left') : (z > 0 ? 'down' : 'up'); };
 
 const NPC_HEIGHT = { towns: 1.75, heroes: 1.95, villains: 2.0, goblins: 1.45, pirates: 1.9 };
 
@@ -30,17 +36,20 @@ export class Field {
     this.chests = [];
     this.followers = [];
     this.trail = [];
-    this.dir = 'down';
     this.t = 0;
     this.steps = 0;
-    this.stepsToEnc = 20;
     this.prompt = h('div', 'prompt hidden', '✦');
     root.appendChild(this.prompt);
     this.target = null;
+    this.party = []; this.ctrl = 0; this.ctrlId = null;
+    this.combat = new Combat(G, this);
     input.field = (a) => this.onAction(a);
   }
   get leader() { return this.player; }
   get pos() { return this.player.position; }
+  /** facing of the controlled character as a compass direction (used by saves / cutscenes) */
+  get dir() { return this._dir || (this.player ? dirOfYaw(this.player.facingYaw) : 'down'); }
+  set dir(v) { this._dir = null; }
 
   // ------------------------------------------------------------ loading
   async enter(mapId, x, z, dir = 'down', { silent = false } = {}) {
@@ -61,10 +70,11 @@ export class Field {
     this.things = []; this.npcs = []; this.chests = []; this.trail = [];
     this._spawnNpcs(); this._spawnChests();
     this.buildParty(x, z, dir);
+    this.world.yaw = yawOfDir(dir); this.world.camDist = this.world.dist;
     this.world.setFocus(this._focus(), true);
-    this.stepsToEnc = rand(def.encounter?.rate?.[0] || 18, def.encounter?.rate?.[1] || 32) + 8;
+    await this.combat.setupMap(def, b);
     G.gfx.setScene(this.world.scene, this.world.camera);
-    G.gfx.setGrade({ focus: 0.5, band: 0.2, amount: 1.5 });
+    G.gfx.setGrade({ focus: 0.5, band: 0.38, amount: 0.7 });
     if (this.world.moon && flag('moon_broken')) { this.world.moon.scale.setScalar(0.82); this.world.moon.material.color.setHex(0xc89aa8); }
     if (def.music !== undefined) audio.playMusic(def.music);
     this.active = true;
@@ -107,7 +117,7 @@ export class Field {
     o.mesh.scale.y = opened ? 0.62 : 0.85;
   }
   buildParty(x, z, dir) {
-    for (const a of [this.player, ...this.followers]) if (a) this.world.remove(a.group);
+    for (const a of this.party) this.world.remove(a.group);
     const ids = state.party.slice(0, 4);
     const mk = (id) => {
       const c = CHARS[id];
@@ -116,14 +126,31 @@ export class Field {
       this.world.add(a.group);
       return a;
     };
-    this.player = mk(ids[0]);
+    this.party = ids.map(mk);
+    this.ctrl = Math.max(0, ids.indexOf(this.ctrlId));
+    this.ctrlId = ids[this.ctrl];
+    this.player = this.party[this.ctrl];
+    this.followers = this.party.filter((a) => a !== this.player);
     this.player.position.set(x, 0, z);
-    this.player.setDir(dir);
-    this.dir = dir;
-    this.followers = ids.slice(1).map(mk);
+    this.player.facingYaw = this.player.yaw = Math.atan2(...(DIRV[dir] || DIRV.down));
+    this._dir = dir;
     this.trail = this._initTrail(x, z, dir);
     this._placeFollowers(0);
-    this.followers.forEach((f) => { f.setDir(dir); f.moving = false; });
+    this.followers.forEach((f) => { f.facingYaw = f.yaw = this.player.facingYaw; f.moving = false; });
+    this.combat.bindParty();
+  }
+  /** take over another party member (Tab / Q / HUD portrait) */
+  setControlled(i) {
+    if (i === this.ctrl || !this.party[i]) return false;
+    const old = this.player, nw = this.party[i];
+    this.ctrl = i; this.ctrlId = nw.id;
+    this.player = nw; this.followers = this.party.filter((a) => a !== nw);
+    const yaw = nw.facingYaw;
+    this.trail = this._initTrail(nw.position.x, nw.position.z, dirOfYaw(yaw));
+    for (const f of this.followers) f.catchup = true;
+    nw.catchup = false;
+    this._dir = null;
+    return true;
   }
   /** a short trail behind the leader so followers stand in a neat line */
   _initTrail(x, z, dir) {
@@ -132,22 +159,32 @@ export class Field {
     for (let i = 0; i < 48; i++) t.push({ x: x - vx * 0.12 * i, z: z - vz * 0.12 * i });
     return t;
   }
-  _focus() {
-    const w = this.b.w, hh = this.b.h, p = this.player.position;
-    return new THREE.Vector3(clamp(p.x, Math.min(8.5, w / 2), Math.max(w - 8.5, w / 2)), 0, clamp(p.z, Math.min(5.5, hh / 2), Math.max(hh - 6, hh / 2)));
-  }
+  _focus() { const p = this.player.position; return new THREE.Vector3(p.x, 0, p.z); }
 
   // ------------------------------------------------------------ collision
-  blockedAt(x, z, ignore) {
+  /** move a position by (dx,dz) with wall sliding; r = body radius; ignoreNpcs for enemies / dashes. Returns distance moved. */
+  tryMove(pos, dx, dz, r = PR, ignoreNpcs = false) {
     const b = this.b;
-    for (const [dx, dz] of [[-PR, -PR], [PR, -PR], [-PR, PR], [PR, PR]]) if (b.isBlocked(Math.floor(x + dx), Math.floor(z + dz))) return true;
-    for (const t of this.things) {
-      if (t === ignore || (t.kind !== 'npc' && t.kind !== 'chest')) continue;
-      if (t.kind === 'npc' && t.def.ghost) continue;
-      const r = t.r + PR - 0.1;
-      if ((t.x - x) ** 2 + (t.z - z) ** 2 < r * r) return true;
+    const hit = (x, z) => {
+      for (const [ox, oz] of [[-r, -r], [r, -r], [-r, r], [r, r]]) if (b.isBlocked(Math.floor(x + ox), Math.floor(z + oz))) return true;
+      if (!ignoreNpcs) for (const t of this.things) {
+        if (t.kind !== 'npc' && t.kind !== 'chest') continue;
+        if (t.kind === 'npc' && t.def.ghost) continue;
+        const rr = t.r + r - 0.1;
+        if ((t.x - x) ** 2 + (t.z - z) ** 2 < rr * rr) return true;
+      }
+      return false;
+    };
+    const ox = pos.x, oz = pos.z;
+    const inside = hit(pos.x, pos.z);   // spawned / pushed into a blocked cell: let it walk out instead of being frozen
+    // sub-step long moves so fast dashes never tunnel through a wall cell
+    const n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.3));
+    for (let i = 0; i < n; i++) {
+      const sx = dx / n, sz = dz / n;
+      if (inside || !hit(pos.x + sx, pos.z)) pos.x += sx;
+      if (inside || !hit(pos.x, pos.z + sz)) pos.z += sz;
     }
-    return false;
+    return Math.hypot(pos.x - ox, pos.z - oz);
   }
 
   // ------------------------------------------------------------ input
@@ -155,7 +192,7 @@ export class Field {
     if (!this.active || this.busy || this.G.paused) return false;
     if (a === 'ok') { if (this.target) this.interact(this.target); return true; }
     if (a === 'menu' || a === 'cancel') { this.G.openMenu(); return true; }
-    return false;
+    return this.combat.onAction(a);
   }
   async interact(t) {
     if (t.kind === 'chest') return this.openChest(t);
@@ -196,14 +233,14 @@ export class Field {
   hidePrompt() { this.prompt.classList.add('hidden'); this.target = null; }
   _updatePrompt() {
     let best = null, bd = 1e9;
-    const [fx, fz] = DIRV[this.dir];
+    const f = this.player.facingYaw, fx = Math.sin(f), fz = Math.cos(f);
     for (const t of this.things) {
-      if (t.kind === 'npc' && t.def.noTalk) continue;
+      if (t.kind === 'npc' && (t.def.noTalk || t.hidden)) continue;
       const dx = t.x - this.pos.x, dz = t.z - this.pos.z, d = Math.hypot(dx, dz);
-      const reach = (t.r || 0.5) + 0.85;
+      const reach = (t.r || 0.5) + 1.25;
       if (d > reach) continue;
       const dot = d > 0.01 ? (dx * fx + dz * fz) / d : 1;
-      if (dot < 0.15 && d > 0.9) continue;
+      if (dot < -0.1 && d > 1.2) continue;
       if (d < bd) { bd = d; best = t; }
     }
     this.target = best;
@@ -212,32 +249,47 @@ export class Field {
     const p = this.G.gfx.project(top);
     this.prompt.classList.remove('hidden');
     this.prompt.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-100%)`;
-    this.prompt.textContent = best.kind === 'chest' ? '✦ Open' : (best.def.prompt || '✦ Talk');
+    this.prompt.textContent = (best.kind === 'chest' ? '✦ Open' : (best.def.prompt || '✦ Talk'));
   }
 
   // ------------------------------------------------------------ update
   update(dt) {
     if (!this.active) return;
     this.t += dt;
-    const free = !this.busy && !input.modal && !this.G.paused;
+    const cb = this.combat;
+    const fighting = !!cb.scripted;                       // a story fight runs inside a busy event: the player is in control again
+    const free = (!this.busy || fighting) && !input.modal && !this.G.paused && !cb.resultBusy && !cb.eventBusy;
     const world = this.world;
-    // ----- player movement
-    let moved = 0;
+    // ----- camera look (mouse / touch / arrow keys)
+    if (!input.modal) {
+      const l = input.takeLook(dt);
+      world.yaw -= l.x * 0.0042;
+      world.pitch = clamp(world.pitch + l.y * 0.0036, 0.06, 1.25);
+      if (l.zoom) world.zoomK = clamp(world.zoomK + l.zoom * 0.12, 0.55, 1.8);
+    }
+    // ----- player movement: camera-relative, free direction
+    const p = this.pos;
+    const px = p.x, pz = p.z;
     if (free) {
-      const v = input.vec();
-      if (v.x || v.y) {
-        const sp = input.run ? 6.6 : 4.4;
-        const p = this.pos;
-        let nx = p.x + v.x * sp * dt, nz = p.z + v.y * sp * dt;
-        const ox = p.x, oz = p.z;
-        if (!this.blockedAt(nx, p.z)) p.x = nx;
-        if (!this.blockedAt(p.x, nz)) p.z = nz;
-        moved = Math.hypot(p.x - ox, p.z - oz);
-        this.player.moving = moved > 0.0005;
-        this.dir = Math.abs(v.x) > Math.abs(v.y) * 1.15 ? (v.x > 0 ? 'right' : 'left') : (v.y > 0 ? 'down' : 'up');
-        this.player.setDir(this.dir);
-      } else this.player.moving = false;
+      if (!cb.controlLocked()) {
+        const v = input.vec();
+        const mod = cb.moveMod();   // attacking slows the player; dodging / stun is driven by the combat code
+        if ((v.x || v.y) && !mod.freeze) {
+          const sy = Math.sin(world.yaw), cy = Math.cos(world.yaw);
+          const mx = cy * v.x + sy * v.y, mz = -sy * v.x + cy * v.y;
+          const l = Math.hypot(mx, mz) || 1;
+          const mag = Math.min(1, Math.hypot(v.x, v.y));
+          const sp = (input.run ? 7.2 : 4.9) * mag * mod.speedMul;
+          const moved = this.tryMove(p, (mx / l) * sp * dt, (mz / l) * sp * dt);
+          this.player.moving = moved > 0.0005;
+          this.player.running = input.run;
+          if (!mod.faceLock) this.player.faceVec(mx, mz);
+        } else this.player.moving = false;
+      }
     } else this.player.moving = false;
+    cb.update(dt);
+    const moved = Math.hypot(p.x - px, p.z - pz);
+    if (moved > 0.0005) this._dir = null;
     // trail for followers
     const last = this.trail[0];
     if (moved > 0 && (this.pos.x - last.x) ** 2 + (this.pos.z - last.z) ** 2 > 0.04) {
@@ -245,56 +297,62 @@ export class Field {
       if (this.trail.length > 240) this.trail.length = 240;
     }
     this._placeFollowers(dt);
-    // ----- steps / encounters / triggers
-    if (moved > 0) {
-      this.steps += moved; state.steps += moved;
-      if (this.def.encounter && !flag('noenc') && this.steps >= 1) {
-        const n = Math.floor(this.steps); this.steps -= n; this.stepsToEnc -= n;
-        if (this.stepsToEnc <= 0) { this._encounter(); return this._finish(dt); }
-      }
-    }
-    if (free) this._checkTriggers(moved > 0);
+    if (moved > 0) { this.steps += moved; state.steps += moved; }
+    if (free && !fighting) this._checkTriggers(true);
     this._npcs(dt);
     this._finish(dt);
-    if (free) this._updatePrompt(); else if (!this.busy) this.hidePrompt();
+    if (free && !fighting) this._updatePrompt(); else this.hidePrompt();
     state.play += dt;
   }
   _finish(dt) {
     const world = this.world;
-    this.player.update(dt); this.followers.forEach((f) => f.update(dt));
+    for (const a of this.party) a.update(dt);
     for (const n of this.npcs) n.actor.update(dt);
     for (const c of this.chests) c.mesh.position.y = 0;
     world.setFocus(this._focus());
     world.update(dt);
   }
   _placeFollowers(dt) {
+    // followers keep a loose V behind the leader (so the camera never stares at someone's back)
+    const FORM = [[0.55, -1.5], [0.75, 1.5], [1.9, -2.8]];   // [distance behind along the trail, sideways offset]
     let acc = 0, ti = 0;
     for (let i = 0; i < this.followers.length; i++) {
-      const need = (i + 1) * 0.95;
-      let cur = this.trail[0], a = cur, bpt = cur;
+      const f = this.followers[i];
+      if (f.ai) continue;                       // the combat AI steers this one
+      const [need, lat] = FORM[i] || [(i + 1) * 0.95, 0];
+      let cur = this.trail[0], tx = 0, tz = 1;
       acc = 0;
       for (ti = 0; ti < this.trail.length - 1; ti++) {
         const p0 = this.trail[ti], p1 = this.trail[ti + 1];
         const seg = Math.hypot(p0.x - p1.x, p0.z - p1.z);
-        if (acc + seg >= need) { const k = (need - acc) / (seg || 1); a = p0; bpt = p1; cur = { x: p0.x + (p1.x - p0.x) * k, z: p0.z + (p1.z - p0.z) * k }; break; }
-        acc += seg; cur = p1; a = p0; bpt = p1;
+        if (acc + seg >= need) { const k = (need - acc) / (seg || 1); cur = { x: p0.x + (p1.x - p0.x) * k, z: p0.z + (p1.z - p0.z) * k }; tx = (p0.x - p1.x) / (seg || 1); tz = (p0.z - p1.z) / (seg || 1); break; }
+        acc += seg; cur = p1;
       }
-      const f = this.followers[i];
-      const dx = cur.x - f.position.x, dz = cur.z - f.position.z;
-      const mv = Math.hypot(dx, dz);
-      f.moving = mv > 0.012;
+      if (lat) {
+        const ox = -tz * lat, oz = tx * lat;
+        if (!this.b.isBlocked(Math.floor(cur.x + ox), Math.floor(cur.z + oz))) cur = { x: cur.x + ox, z: cur.z + oz };
+      }
+      let dx = cur.x - f.position.x, dz = cur.z - f.position.z;
+      let mv = Math.hypot(dx, dz);
+      if (dt > 0 && mv > 0.02) {                 // glide into place (also hides the trail's sharp corners)
+        const stepLen = Math.min(mv, (f.catchup ? 8.5 : 7.4) * dt + 0.0);
+        if (mv > 14) { f.position.x = cur.x; f.position.z = cur.z; f.moving = false; continue; }
+        f.position.x += (dx / mv) * stepLen; f.position.z += (dz / mv) * stepLen;
+        f.moving = stepLen > 0.004; f.faceVec(dx, dz);
+        if (mv - stepLen < 0.05) f.catchup = false;
+        continue;
+      }
+      f.catchup = false;
       f.position.x = cur.x; f.position.z = cur.z;
-      if (mv > 0.012) {
-        const d = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 'right' : 'left') : (dz > 0 ? 'down' : 'up');
-        f.setDir(d);
-      } else if (!this.player.moving) f.setDir(this.dir === 'up' ? 'up' : 'down');
+      f.moving = false;
+      if (!this.player.moving) f.facingYaw = this.player.facingYaw;
     }
   }
   _npcs(dt) {
     for (const n of this.npcs) {
       const d = n.def;
       n.actor.moving = false;
-      if (!d.wander || this.busy) continue;
+      if (n.hidden || !d.wander || this.busy) continue;
       n.wt -= dt;
       if (!n.tgt && n.wt <= 0) {
         n.tgt = [n.home[0] + (Math.random() - 0.5) * 2 * d.wander, n.home[1] + (Math.random() - 0.5) * 2 * d.wander];
@@ -347,26 +405,15 @@ export class Field {
     await this.G.fadeTo(0, 420);
   }
 
-  // ------------------------------------------------------------ encounters
-  async _encounter() {
-    const enc = this.def.encounter;
-    this.stepsToEnc = rand(enc.rate?.[0] || 18, enc.rate?.[1] || 32);
-    const zoneName = typeof enc.zone === 'function' ? enc.zone() : enc.zone;
-    const table = ZONES[zoneName];
-    if (!table) return;
-    const tot = table.reduce((s, e) => s + e[0], 0);
-    let r = Math.random() * tot, group = table[0][1];
-    for (const [w, e] of table) { if ((r -= w) <= 0) { group = e; break; } }
-    this.busy = true; this.player.moving = false; this.hidePrompt();
-    const res = await this.G.startBattle({ enemies: group, stage: enc.stage || this.def.stage || 'field', canFlee: true });
-    this.busy = false;
-    if (res === 'defeat') return;
-  }
   /** place the party at a new spot without a transition */
   teleportParty(x, z, dir) {
     this.pos.set(x, 0, z);
-    this.dir = dir || this.dir; this.player.setDir(this.dir);
-    this.trail = this._initTrail(x, z, this.dir);
+    const d = dir || this.dir;
+    this.player.facingYaw = this.player.yaw = Math.atan2(...(DIRV[d] || DIRV.down));
+    this._dir = d;
+    this.world.yaw = yawOfDir(d);
+    this.trail = this._initTrail(x, z, d);
+    for (const f of this.followers) { f.catchup = false; f.ai = false; }
     this._placeFollowers(0);
     this.world.setFocus(this._focus(), true);
   }
@@ -383,8 +430,7 @@ export class Field {
     const ms = (len / speed) * 1000;
     const sx = p.x, sz = p.z;
     actor.moving = true;
-    if (actor.keys && actor.keys.right) actor.setDir(Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 'right' : 'left') : (dz > 0 ? 'down' : 'up'));
-    else actor.faceVec(dx, dz);
+    actor.faceVec(dx, dz);
     await tween(ms, (t) => { const k = t; p.x = sx + dx * k; p.z = sz + dz * k; onMove && onMove(p.x, p.z); });
     actor.moving = false;
   }
@@ -394,8 +440,8 @@ export class Field {
     const sx = a.position.x, sz = a.position.z;
     const dx = x - sx, dz = z - sz, len = Math.hypot(dx, dz);
     if (len < 0.02) return;
-    this.dir = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 'right' : 'left') : (dz > 0 ? 'down' : 'up');
-    a.setDir(this.dir); a.moving = true;
+    a.faceVec(dx, dz); a.moving = true;
+    for (const f of this.followers) f.ai = false;
     await tween((len / speed) * 1000, (t) => {
       a.position.x = sx + dx * t; a.position.z = sz + dz * t;
       this.trail.unshift({ x: a.position.x, z: a.position.z }); if (this.trail.length > 240) this.trail.length = 240;
@@ -403,7 +449,11 @@ export class Field {
     });
     a.moving = false;
   }
-  face(dir) { this.dir = dir; this.player.setDir(dir); }
+  face(dir) { this.player.facingYaw = Math.atan2(...(DIRV[dir] || DIRV.down)); this._dir = dir; }
+  hideNpc(n, hide) {
+    n.hidden = hide;
+    n.actor.group.visible = !hide;
+  }
   removeNpc(id) {
     const i = this.npcs.findIndex((q) => q.def.id === id);
     if (i < 0) return;

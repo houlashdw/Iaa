@@ -63,6 +63,7 @@ export class MapBuilder {
     this.h = def.size[1];
     this.group = new THREE.Group();
     this.blocked = new Uint8Array(this.w * this.h);
+    this.hgt = new Float32Array(this.w * this.h); // height of whatever blocks a cell (camera collision)
     this.reserved = new Uint8Array(this.w * this.h);
     this.rng = mulberry32(def.seed || 7);
     this.boxes = new Map(); // material key -> {mat, geos[]}
@@ -78,11 +79,11 @@ export class MapBuilder {
   // ---------------- collision / reservation
   inb(cx, cz) { return cx >= 0 && cz >= 0 && cx < this.w && cz < this.h; }
   isBlocked(cx, cz) { return !this.inb(cx, cz) || this.blocked[cz * this.w + cx] === 1; }
-  solid(x, z, w = 1, d = 1) {
-    for (let cz = Math.floor(z); cz < Math.ceil(z + d - 1e-6); cz++) for (let cx = Math.floor(x); cx < Math.ceil(x + w - 1e-6); cx++) if (this.inb(cx, cz)) this.blocked[cz * this.w + cx] = 1;
+  solid(x, z, w = 1, d = 1, h = 2.6) {
+    for (let cz = Math.floor(z); cz < Math.ceil(z + d - 1e-6); cz++) for (let cx = Math.floor(x); cx < Math.ceil(x + w - 1e-6); cx++) if (this.inb(cx, cz)) { const i = cz * this.w + cx; this.blocked[i] = 1; this.hgt[i] = Math.max(this.hgt[i], h); }
   }
   free(x, z, w = 1, d = 1) {
-    for (let cz = Math.floor(z); cz < Math.ceil(z + d - 1e-6); cz++) for (let cx = Math.floor(x); cx < Math.ceil(x + w - 1e-6); cx++) if (this.inb(cx, cz)) this.blocked[cz * this.w + cx] = 0;
+    for (let cz = Math.floor(z); cz < Math.ceil(z + d - 1e-6); cz++) for (let cx = Math.floor(x); cx < Math.ceil(x + w - 1e-6); cx++) if (this.inb(cx, cz)) { this.blocked[cz * this.w + cx] = 0; this.hgt[cz * this.w + cx] = 0; }
   }
   reserve(x, z, w = 1, d = 1) {
     for (let cz = Math.floor(z); cz < Math.ceil(z + d - 1e-6); cz++) for (let cx = Math.floor(x); cx < Math.ceil(x + w - 1e-6); cx++) if (this.inb(cx, cz)) this.reserved[cz * this.w + cx] = 1;
@@ -147,7 +148,7 @@ export class MapBuilder {
     mesh.position.set(x + w / 2, y, z + d / 2);
     this.group.add(mesh);
     this.waters.push(mesh);
-    if (blockedCells) this.solid(x, z, w, d);
+    if (blockedCells) this.solid(x, z, w, d, 0);
     return mesh;
   }
 
@@ -157,7 +158,7 @@ export class MapBuilder {
     const g = boxGeo(w, h, d, tile);
     g.translate(x + w / 2, y + h / 2, z + d / 2);
     this._addGeo(g, tex, tint, { emissive, opacity });
-    if (solid) this.solid(x, z, w, d);
+    if (solid) this.solid(x, z, w, d, y + h);
   }
   /** flat coloured box without texture (windows, flames, crystals ...) */
   glow(x, y, z, w, h, d, color, { opacity = 1 } = {}) {
@@ -227,7 +228,7 @@ export class MapBuilder {
     m.compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot), new THREE.Vector3(sc, sc, sc));
     if (!this.placements.has(name)) this.placements.set(name, []);
     this.placements.get(name).push(m);
-    if (solid > 0) this.solid(x - solid, z - solid, solid * 2, solid * 2);
+    if (solid > 0) this.solid(x - solid, z - solid, solid * 2, solid * 2, /^(tree|column|obelisk|crystal|tent|cargo)/.test(name) ? 4.2 : /^(rock_(large|tall)|barrels?|crate|chest)/.test(name) ? 1.4 : 0.9);
   }
   /** random props inside a rectangle of cells (never on reserved/blocked cells) */
   scatter(names, rect, count, { solid = 0, s = 1, minDist = 0.9, tries = 12, ry = null } = {}) {
@@ -271,7 +272,7 @@ export class MapBuilder {
       const x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
       if (gap.some(([gx, gz]) => Math.abs(gx - x) < 1.1 && Math.abs(gz - z) < 1.1)) continue;
       this.prop('fence', x, z, { ry: alongX ? 0 : Math.PI / 2, s: 1 });
-      this.solid(x - 0.5, z - 0.5, 1, 1);
+      this.solid(x - 0.5, z - 0.5, 1, 1, 0.8);
     }
   }
 
@@ -287,7 +288,7 @@ export class MapBuilder {
         // only build geometry for walls that touch a floor cell (the rest is never seen)
         let touch = false;
         for (let a = i; a < k && !touch; a++) for (const [dx, dz] of [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]) { const r = rows[j + dz]; if (r && r[a + dx] === '.') { touch = true; break; } }
-        this.solid(x + i, z + j, k - i, 1);
+        this.solid(x + i, z + j, k - i, 1, h);
         if (touch) this.box(x + i, z + j, k - i, 1, h, { tex, tint, tile, solid: false });
         i = k;
       }
@@ -296,7 +297,7 @@ export class MapBuilder {
     let n = 0;
     const cols = [0x6fe8ff, 0xb08aff, 0x7affd0, 0x6fe8ff];
     for (let j = 0; j < rows.length; j++) for (let i = 0; i < rows[j].length; i++) if (rows[j][i] === 'c') {
-      this.solid(x + i, z + j, 1, 1);
+      this.solid(x + i, z + j, 1, 1, 1.4);
       this.glowCrystal(x + i + 0.5, z + j + 0.5, { color: cols[n % cols.length], s: 0.7 + this.rng() * 0.7, lightOn: n % 5 === 0 }); n++;
     }
     // floor cells are walkable; everything outside the grid is blocked by the map bounds

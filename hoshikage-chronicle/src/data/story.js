@@ -1,7 +1,7 @@
 // Speakers, shared story helpers, and the prologue.
 import * as THREE from 'three';
 import { state, setFlag, flag, addItem, addChar } from '../state.js';
-import { tween, easeOut, sleep } from '../core/util.js';
+import { tween, easeOut, sleep, clamp } from '../core/util.js';
 
 const P = (name, sprite, color) => ({ name, sprite, side: 'left', color });
 const N = (name, sprite, color = '#ffd36b') => ({ name, sprite, side: 'right', color });
@@ -30,6 +30,10 @@ export const SPEAKERS = {
 // ------------------------------------------------------------------ cinematic helpers
 export async function camTo(G, { pitch, dist, yaw, look, ms = 1200 }) {
   const w = G.field.world;
+  if (w.third && w.baseCam) {   // cutscene camera values were written for the old fixed camera: map them onto the third-person one
+    if (pitch !== undefined) pitch = clamp(w.baseCam.pitch + (pitch - 0.76) * 0.45, 0.05, 1.1);
+    if (dist !== undefined) dist = (w.baseCam.dist * dist) / 15;
+  }
   const p0 = w.pitch, d0 = w.dist, y0 = w.yaw, l0 = w.lookUp;
   await tween(ms, (t) => { const k = t * t * (3 - 2 * t); if (pitch !== undefined) w.pitch = p0 + (pitch - p0) * k; if (dist !== undefined) w.dist = d0 + (dist - d0) * k; if (yaw !== undefined) w.yaw = y0 + (yaw - y0) * k; if (look !== undefined) w.lookUp = l0 + (look - l0) * k; });
 }
@@ -141,7 +145,8 @@ export async function prologueScene(G, F) {
   state.chapter = 1;
   await G.fadeTo(0, 1100);
   await G.banner('Hinode Village', 'Morning', 2200);
-  G.toast('Tip: Esc / M opens the menu. Visit the shops, then leave by the north gate.', '');
+  G.showControls();
+  G.toast('Visit the shops, then leave by the north gate. Press M for the menu.', '');
   G.autosave();
 }
 
@@ -170,7 +175,7 @@ export async function epilogue(G, F) {
   await G.say(['*: And somewhere above the quiet village, a single star streaked across a healed sky — not falling, this time, but dancing.']);
   await G.fadeTo(1, 1600);
   await G.card(['HOSHIKAGE CHRONICLE', 'THE END'], { ms: 4200 });
-  await G.card(['Thank you for playing', 'Art: Sprite Foundry · Kenney · Quaternius · Screaming Brain Studios · cynicmusic'], { ms: 5200 });
+  await G.card(['Thank you for playing', 'Art: VRoid Project · Kenney · Quaternius · Screaming Brain Studios · Music: cynicmusic and others'], { ms: 5200 });
   state.flags.game_complete = true;
   G.autosave();
   G.toTitle();

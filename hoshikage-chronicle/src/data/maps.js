@@ -1,0 +1,13 @@
+import { registerVillage } from './maps_village.js';
+import { registerWoods } from './maps_woods.js';
+import { registerShrine } from './maps_shrine.js';
+import { registerPort } from './maps_port.js';
+import { registerCave } from './maps_cave.js';
+import { registerCastle } from './maps_castle.js';
+export const MAPS = {};
+registerVillage(MAPS);
+registerWoods(MAPS);
+registerShrine(MAPS);
+registerPort(MAPS);
+registerCave(MAPS);
+registerCastle(MAPS);

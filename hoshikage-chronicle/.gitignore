@@ -1,0 +1,6 @@
+node_modules/
+.cache/
+*.log
+# only the finished single-file game is tracked; the dev bundle is rebuilt with `npm run dev`
+dist/*
+!dist/hoshikage-chronicle.html

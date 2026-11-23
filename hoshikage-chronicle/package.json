@@ -1,0 +1,21 @@
+{
+  "name": "hoshikage-chronicle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hoshikage Chronicle - an HD-2D anime JRPG that runs in the browser (single HTML file build).",
+  "type": "module",
+  "scripts": {
+    "assets": "bash tools/fetch-assets.sh && python3 tools/prepare-assets.py",
+    "build": "node tools/build.mjs",
+    "dev": "node tools/build.mjs --dev-only --no-min",
+    "check": "node tools/check-maps.mjs",
+    "sim": "node tools/sim.mjs",
+    "test": "node tools/story-test.mjs"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

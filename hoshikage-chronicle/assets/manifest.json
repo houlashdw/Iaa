@@ -1,0 +1,564 @@
+{
+ "party": {
+  "haru": {
+   "src": "towns/child"
+  },
+  "airi": {
+   "src": "heroes/white_mage"
+  },
+  "ren": {
+   "src": "heroes/samurai"
+  },
+  "daigo": {
+   "src": "heroes/monk"
+  },
+  "sylva": {
+   "src": "heroes/ranger"
+  },
+  "zeno": {
+   "src": "heroes/sorcerer"
+  }
+ },
+ "chars": {
+  "heroes_artificer": {
+   "src": "heroes/artificer",
+   "battle": true,
+   "big": true
+  },
+  "heroes_barbarian": {
+   "src": "heroes/barbarian",
+   "battle": true,
+   "big": true
+  },
+  "heroes_bard": {
+   "src": "heroes/bard",
+   "battle": true,
+   "big": true
+  },
+  "heroes_cleric": {
+   "src": "heroes/cleric",
+   "battle": true,
+   "big": true
+  },
+  "heroes_druid": {
+   "src": "heroes/druid",
+   "battle": true,
+   "big": true
+  },
+  "heroes_fighter": {
+   "src": "heroes/fighter",
+   "battle": true,
+   "big": true
+  },
+  "heroes_knight": {
+   "src": "heroes/knight",
+   "battle": true,
+   "big": true
+  },
+  "heroes_mage": {
+   "src": "heroes/mage",
+   "battle": true,
+   "big": true
+  },
+  "heroes_paladin": {
+   "src": "heroes/paladin",
+   "battle": true,
+   "big": true
+  },
+  "heroes_rogue": {
+   "src": "heroes/rogue",
+   "battle": true,
+   "big": true
+  },
+  "heroes_warlock": {
+   "src": "heroes/warlock",
+   "battle": true,
+   "big": true
+  },
+  "villains_assassin": {
+   "src": "villains/assassin",
+   "battle": true,
+   "big": true
+  },
+  "villains_bandit_king": {
+   "src": "villains/bandit-king",
+   "battle": true,
+   "big": true
+  },
+  "villains_blackguard": {
+   "src": "villains/blackguard",
+   "battle": true,
+   "big": true
+  },
+  "villains_corrupted_paladin": {
+   "src": "villains/corrupted-paladin",
+   "battle": true,
+   "big": true
+  },
+  "villains_cult_priest": {
+   "src": "villains/cult-priest",
+   "battle": true,
+   "big": true
+  },
+  "villains_dark_elf_matriarch": {
+   "src": "villains/dark-elf-matriarch",
+   "battle": true,
+   "big": true
+  },
+  "villains_dark_monk": {
+   "src": "villains/dark-monk",
+   "battle": true,
+   "big": true
+  },
+  "villains_dread_ranger": {
+   "src": "villains/dread-ranger",
+   "battle": true,
+   "big": true
+  },
+  "villains_gorgon": {
+   "src": "villains/gorgon",
+   "battle": true,
+   "big": true
+  },
+  "villains_mind_tyrant": {
+   "src": "villains/mind-tyrant",
+   "battle": true,
+   "big": true
+  },
+  "villains_necromancer": {
+   "src": "villains/necromancer",
+   "battle": true,
+   "big": true
+  },
+  "villains_plague_doctor": {
+   "src": "villains/plague-doctor",
+   "battle": true,
+   "big": true
+  },
+  "villains_reaver": {
+   "src": "villains/reaver",
+   "battle": true,
+   "big": true
+  },
+  "villains_vampire_lord": {
+   "src": "villains/vampire-lord",
+   "battle": true,
+   "big": true
+  },
+  "villains_warlord": {
+   "src": "villains/warlord",
+   "battle": true,
+   "big": true
+  },
+  "villains_witch": {
+   "src": "villains/witch",
+   "battle": true,
+   "big": true
+  },
+  "goblins_alchemist": {
+   "src": "goblins/alchemist",
+   "battle": true,
+   "big": false
+  },
+  "goblins_archer": {
+   "src": "goblins/archer",
+   "battle": true,
+   "big": false
+  },
+  "goblins_banner_bearer": {
+   "src": "goblins/banner-bearer",
+   "battle": true,
+   "big": false
+  },
+  "goblins_bomber": {
+   "src": "goblins/bomber",
+   "battle": true,
+   "big": false
+  },
+  "goblins_brute": {
+   "src": "goblins/brute",
+   "battle": true,
+   "big": true
+  },
+  "goblins_cook": {
+   "src": "goblins/cook",
+   "battle": true,
+   "big": false
+  },
+  "goblins_crossbowman": {
+   "src": "goblins/crossbowman",
+   "battle": true,
+   "big": false
+  },
+  "goblins_cutpurse": {
+   "src": "goblins/cutpurse",
+   "battle": true,
+   "big": false
+  },
+  "goblins_duelist": {
+   "src": "goblins/duelist",
+   "battle": true,
+   "big": false
+  },
+  "goblins_elder": {
+   "src": "goblins/elder",
+   "battle": true,
+   "big": true
+  },
+  "goblins_firebrand": {
+   "src": "goblins/firebrand",
+   "battle": true,
+   "big": false
+  },
+  "goblins_grunt": {
+   "src": "goblins/grunt",
+   "battle": true,
+   "big": false
+  },
+  "goblins_merchant": {
+   "src": "goblins/merchant",
+   "battle": true,
+   "big": true
+  },
+  "goblins_prisoner": {
+   "src": "goblins/prisoner",
+   "battle": true,
+   "big": false
+  },
+  "goblins_pup": {
+   "src": "goblins/pup",
+   "battle": true,
+   "big": false
+  },
+  "goblins_ratcatcher": {
+   "src": "goblins/ratcatcher",
+   "battle": true,
+   "big": false
+  },
+  "goblins_scout": {
+   "src": "goblins/scout",
+   "battle": true,
+   "big": false
+  },
+  "goblins_shaman": {
+   "src": "goblins/shaman",
+   "battle": true,
+   "big": true
+  },
+  "goblins_shieldbearer": {
+   "src": "goblins/shieldbearer",
+   "battle": true,
+   "big": false
+  },
+  "goblins_slaver": {
+   "src": "goblins/slaver",
+   "battle": true,
+   "big": false
+  },
+  "goblins_slinger": {
+   "src": "goblins/slinger",
+   "battle": true,
+   "big": false
+  },
+  "goblins_spore_tender": {
+   "src": "goblins/spore-tender",
+   "battle": true,
+   "big": false
+  },
+  "goblins_trap_maker": {
+   "src": "goblins/trap-maker",
+   "battle": true,
+   "big": false
+  },
+  "goblins_tunneler": {
+   "src": "goblins/tunneler",
+   "battle": true,
+   "big": false
+  },
+  "goblins_warchief": {
+   "src": "goblins/warchief",
+   "battle": true,
+   "big": true
+  },
+  "goblins_wolf_rider": {
+   "src": "goblins/wolf-rider",
+   "battle": true,
+   "big": false
+  },
+  "pirates_berserker": {
+   "src": "pirates/berserker",
+   "battle": true,
+   "big": false
+  },
+  "pirates_bombardier": {
+   "src": "pirates/bombardier",
+   "battle": true,
+   "big": false
+  },
+  "pirates_bosun": {
+   "src": "pirates/bosun",
+   "battle": true,
+   "big": false
+  },
+  "pirates_breaker": {
+   "src": "pirates/breaker",
+   "battle": true,
+   "big": false
+  },
+  "pirates_brig_keeper": {
+   "src": "pirates/brig-keeper",
+   "battle": true,
+   "big": false
+  },
+  "pirates_cabin_kid": {
+   "src": "pirates/cabin-kid",
+   "battle": true,
+   "big": false
+  },
+  "pirates_cannoneer": {
+   "src": "pirates/cannoneer",
+   "battle": true,
+   "big": false
+  },
+  "pirates_captain": {
+   "src": "pirates/captain",
+   "battle": true,
+   "big": true
+  },
+  "pirates_cook": {
+   "src": "pirates/cook",
+   "battle": true,
+   "big": false
+  },
+  "pirates_diver": {
+   "src": "pirates/diver",
+   "battle": true,
+   "big": false
+  },
+  "pirates_first_mate": {
+   "src": "pirates/first-mate",
+   "battle": true,
+   "big": true
+  },
+  "pirates_harpooner": {
+   "src": "pirates/harpooner",
+   "battle": true,
+   "big": false
+  },
+  "pirates_juggernaut": {
+   "src": "pirates/juggernaut",
+   "battle": true,
+   "big": true
+  },
+  "pirates_marine": {
+   "src": "pirates/marine",
+   "battle": true,
+   "big": false
+  },
+  "pirates_marksman": {
+   "src": "pirates/marksman",
+   "battle": true,
+   "big": false
+  },
+  "pirates_navigator": {
+   "src": "pirates/navigator",
+   "battle": true,
+   "big": true
+  },
+  "pirates_poisoner": {
+   "src": "pirates/poisoner",
+   "battle": true,
+   "big": false
+  },
+  "pirates_quartermaster": {
+   "src": "pirates/quartermaster",
+   "battle": true,
+   "big": true
+  },
+  "pirates_reaver": {
+   "src": "pirates/reaver",
+   "battle": true,
+   "big": false
+  },
+  "pirates_rigger": {
+   "src": "pirates/rigger",
+   "battle": true,
+   "big": false
+  },
+  "pirates_sawbones": {
+   "src": "pirates/sawbones",
+   "battle": true,
+   "big": false
+  },
+  "pirates_sea_witch": {
+   "src": "pirates/sea-witch",
+   "battle": true,
+   "big": true
+  },
+  "pirates_smuggler": {
+   "src": "pirates/smuggler",
+   "battle": true,
+   "big": false
+  },
+  "pirates_stormcaller": {
+   "src": "pirates/stormcaller",
+   "battle": true,
+   "big": true
+  },
+  "pirates_swashbuckler": {
+   "src": "pirates/swashbuckler",
+   "battle": true,
+   "big": true
+  },
+  "pirates_tide_cultist": {
+   "src": "pirates/tide-cultist",
+   "battle": true,
+   "big": true
+  },
+  "towns_barmaid": {
+   "src": "towns/barmaid",
+   "battle": false,
+   "big": true
+  },
+  "towns_beggar": {
+   "src": "towns/beggar",
+   "battle": false,
+   "big": true
+  },
+  "towns_blacksmith": {
+   "src": "towns/blacksmith",
+   "battle": false,
+   "big": true
+  },
+  "towns_elder": {
+   "src": "towns/elder",
+   "battle": false,
+   "big": true
+  },
+  "towns_farmer": {
+   "src": "towns/farmer",
+   "battle": false,
+   "big": true
+  },
+  "towns_fisherman": {
+   "src": "towns/fisherman",
+   "battle": false,
+   "big": true
+  },
+  "towns_guard": {
+   "src": "towns/guard",
+   "battle": false,
+   "big": true
+  },
+  "towns_herbalist": {
+   "src": "towns/herbalist",
+   "battle": false,
+   "big": true
+  },
+  "towns_innkeeper": {
+   "src": "towns/innkeeper",
+   "battle": false,
+   "big": true
+  },
+  "towns_lamplighter": {
+   "src": "towns/lamplighter",
+   "battle": false,
+   "big": true
+  },
+  "towns_merchant": {
+   "src": "towns/merchant",
+   "battle": false,
+   "big": true
+  },
+  "towns_minstrel": {
+   "src": "towns/minstrel",
+   "battle": false,
+   "big": true
+  },
+  "towns_noble": {
+   "src": "towns/noble",
+   "battle": false,
+   "big": true
+  },
+  "towns_scribe": {
+   "src": "towns/scribe",
+   "battle": false,
+   "big": true
+  },
+  "towns_stable_hand": {
+   "src": "towns/stable-hand",
+   "battle": false,
+   "big": true
+  }
+ },
+ "models": [
+  "tree_oak",
+  "tree_pine",
+  "tree_pine_tall",
+  "tree_autumn",
+  "tree_dark",
+  "tree_fat",
+  "tree_palm",
+  "bush",
+  "bush_large",
+  "rock_large",
+  "rock_small",
+  "rock_tall",
+  "log",
+  "stump",
+  "flower_red",
+  "mushroom_red",
+  "pumpkin",
+  "fence",
+  "tent",
+  "campfire",
+  "crate",
+  "barrel",
+  "barrels",
+  "chest",
+  "column",
+  "column_broken",
+  "obelisk",
+  "crystal",
+  "crystal_rock",
+  "gem_pink",
+  "sword",
+  "greatsword",
+  "fish",
+  "cargo_ship"
+ ],
+ "textures": [
+  "grass",
+  "stone",
+  "dirt",
+  "wood",
+  "wall",
+  "bark",
+  "gravel",
+  "plate",
+  "metal",
+  "concrete"
+ ],
+ "sfx": [
+  "big_kill",
+  "boss",
+  "coin",
+  "confirm",
+  "dash",
+  "downed",
+  "gem",
+  "hit",
+  "hurt",
+  "impact",
+  "kill",
+  "land",
+  "level_up",
+  "revive",
+  "shoot",
+  "step",
+  "ui"
+ ],
+ "music": [
+  "battle_theme_a"
+ ]
+}

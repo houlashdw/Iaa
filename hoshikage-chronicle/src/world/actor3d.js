@@ -52,6 +52,8 @@ export class Actor3D {
         if (node) { this.bones[b] = node; this.rest[b] = node.quaternion.clone(); }
       }
       this._props(spec);
+      const pt = (spec.props || []).map((q) => q.type);
+      this.attackKind = pt.includes('bow') ? 'shoot' : pt.includes('staff') ? 'staff' : pt.some((x) => x === 'katana' || x === 'sword' || x === 'spear') ? 'swing' : 'punch';
     } else this._setupMixer(tpl);
     this.facingYaw = YAW[facing || (tex.front.endsWith('_fl') ? 'left' : 'down')] ?? 0;
     this.yaw = this.facingYaw;
@@ -120,7 +122,7 @@ export class Actor3D {
   faceVec(dx, dz) { if (Math.abs(dx) + Math.abs(dz) > 1e-4) this.facingYaw = Math.atan2(dx, dz); }
   setTint(c) { this.baseTint.set(c); }
   setTexKey() {}
-  attack(d = 0.42) { this.attackT = 0.001; this.attackDur = d; if (this.act && this.act.attack) { this.act.attack.reset().play(); setTimeout(() => this.cur && this.cur.play(), 0); } }
+  attack(d = 0.42) { this.attackT = 0.001; this.attackDur = d; this.hand = !this.hand; if (this.act && this.act.attack) { this.act.attack.reset().play(); setTimeout(() => this.cur && this.cur.play(), 0); } }
   cast() { this.castT = 0.7; this.castDur = 0.7; }
   hit() { this.hitT = 0.4; if (this.act && this.act.hit) this.act.hit.reset().play(); }
   /** proxy used by battle code to fade enemies out */
@@ -139,6 +141,7 @@ export class Actor3D {
     n.quaternion.copy(this.rest[name]).multiply(_q);
   }
   update(dt) {
+    if (this.frozen) return;
     this.t += dt; const t = this.t;
     // smooth turning
     this.yaw += wrap(this.facingYaw - this.yaw) * Math.min(1, dt * 12);
@@ -151,14 +154,15 @@ export class Actor3D {
     if (this.tpl.isVrm) this._poseVrm(t, w, dt); else this._poseMixer(dt);
     // bob / hop
     this.bob.position.y = (this.moving ? Math.abs(Math.sin(this.walkPhase)) * 0.035 * (this.height / 1.8) : 0) + this.hop;
-    // tint, flash, alpha
+    // tint, flash, alpha: only touch the materials when something changed (a VRM has ~30 of them)
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 4);
-    const f = 1 + this.flash * 2.2;
-    const bt = this.baseTint;
-    const transparent = this.alpha < 1;
-    for (const r of this.mats) {
-      r.m.color.setRGB(r.base.r * bt.r * f, r.base.g * bt.g * f, r.base.b * bt.b * f);
-      if (transparent || r.m.transparent !== !!r.base._t) {
+    const bt = this.baseTint, transparent = this.alpha < 1;
+    const sig = bt.r + '|' + bt.g + '|' + bt.b + '|' + this.flash.toFixed(2) + '|' + this.alpha.toFixed(2);
+    if (sig !== this._sig) {
+      this._sig = sig;
+      const f = 1 + this.flash * 2.2;
+      for (const r of this.mats) {
+        r.m.color.setRGB(r.base.r * bt.r * f, r.base.g * bt.g * f, r.base.b * bt.b * f);
         if (transparent) { r.m.transparent = true; r.m.opacity = this.alpha; r.m.depthWrite = this.alpha > 0.5; }
       }
     }
@@ -168,29 +172,56 @@ export class Actor3D {
     this._play(moving ? 'walk' : 'idle');
     this.mixer.update(dt);
   }
+  /** Procedural pose. Bone frames are the VRM rest (T-pose) frames: +x swings a hanging limb FORWARD, a forward lean is -x,
+   *  arms are lowered with z (left +, right -), elbows bend about y (left -, right +), knees bend with -x. */
   _poseVrm(t, w, dt = 1 / 60) {
-    const arm = 1.18; // lower the T-pose arms
-    const sw = Math.sin(this.walkPhase) * w;
+    const arm = 1.2;
+    const run = this.running ? 1 : 0;
+    const ph = this.walkPhase;
+    const s = Math.sin(ph) * w, c = Math.cos(ph) * w;
     const br = Math.sin(t * 2.1) * (1 - w);
-    // attack / cast / hit overlays
     let atk = 0, cast = 0, hit = 0;
-    if (this.attackT > 0) { this.attackT += dt; const k = this.attackT / (this.attackDur || 0.42); atk = k < 1 ? Math.sin(k * Math.PI) : 0; if (k >= 1) this.attackT = 0; }
-    if (this.castT > 0) { this.castT -= dt; const cd = this.castDur || 0.9; cast = Math.min(1, Math.sin(Math.min(1, (cd - this.castT) / cd) * Math.PI) * 1.4); }
+    if (this.attackT > 0) { this.attackT += dt; const k = this.attackT / (this.attackDur || 0.42); atk = k < 1 ? Math.sin(Math.min(1, k) * Math.PI * 0.95) : 0; if (k >= 1) this.attackT = 0; }
+    if (this.castT > 0) { this.castT -= dt; const cd = this.castDur || 0.7; cast = Math.min(1, Math.sin(Math.min(1, (cd - this.castT) / cd) * Math.PI) * 1.5); }
     if (this.hitT > 0) { this.hitT -= dt; hit = Math.sin(Math.max(0, this.hitT / 0.4) * Math.PI); }
-    this._bone('hips', 0, 0, 0);
-    this._bone('spine', 0.03 * br - 0.12 * atk * 0 + 0.25 * hit, atk * 0.5 * 0, 0);
-    this._bone('chest', 0.02 * br + atk * 0.18, -atk * 0.9, 0);
-    this._bone('head', -0.04 * br - 0.2 * hit, 0, 0);
-    // arms: rest pose lowered, swing opposite to legs
-    this._bone('leftUpperArm', -sw * 0.7 * 0 + (-0.1 - atk * 0.2) * 0, 0, arm - cast * 2.3 + 0.04 * br);
-    this._bone('rightUpperArm', -atk * 0.9, -atk * 1.1, -arm + cast * 2.3 + atk * 1.9 - 0.04 * br);
-    this._bone('leftLowerArm', 0, 0, 0.12 * (1 - cast));
-    this._bone('rightLowerArm', 0, 0, -0.12 * (1 - cast));
-    // legs
-    this._bone('leftUpperLeg', sw * 0.65, 0, 0);
-    this._bone('rightUpperLeg', -sw * 0.65, 0, 0);
-    this._bone('leftLowerLeg', Math.max(0, -sw) * 0.9, 0, 0);
-    this._bone('rightLowerLeg', Math.max(0, sw) * 0.9, 0, 0);
+    const roll = this.roll || 0;
+    const kind = this.attackKind;
+    const swing = kind === 'swing' || kind === 'punch';
+    const side = kind === 'punch' && this.hand ? -1 : 1;          // punches alternate hands
+    // ---- torso
+    this._bone('hips', 0.04 * roll, -s * 0.16, 0);
+    this._bone('spine', -0.06 * w - 0.1 * run * w - 0.9 * roll * 0.5 + 0.03 * br + 0.28 * hit - 0.08 * atk, s * 0.12 + atk * 0.35 * side * (swing ? 1 : 0), 0);
+    this._bone('chest', 0.02 * br - 0.04 * w - 0.3 * roll + 0.1 * hit, -s * 0.14 - atk * 0.7 * side * (swing ? 1 : 0.2), 0);
+    this._bone('head', -0.03 * br - 0.2 * hit + 0.05 * roll - cast * 0.12 + 0.04 * run * w, s * 0.06, 0);
+    // ---- arms
+    const sw = 0.5 + 0.3 * run;
+    let lx = -s * sw, rx = s * sw;                                   // opposite to the legs
+    let lz = arm, rz = -arm;
+    let ly = 0, ry = 0;
+    let le = 0.22 + 0.5 * run * w + 0.25 * Math.max(0, c) * w, re = 0.22 + 0.5 * run * w + 0.25 * Math.max(0, -c) * w; // elbow bend
+    if (kind === 'shoot') { lx += atk * 1.55; lz -= atk * 0.45; rx += atk * 0.9; rz += atk * 0.3; re += atk * 0.9; }
+    else if (swing) {
+      const R = side > 0 ? 1 : 0, L = 1 - R;
+      rx += atk * R * 2.3 - atk * L * 0.5; rz += atk * R * 0.7; re += atk * R * 0.2; ry += atk * R * 0.4;
+      lx += atk * L * 2.3 - atk * R * 0.3; lz -= atk * L * 0.7; le += atk * L * 0.2; ly -= atk * L * 0.4;
+    }
+    const up = Math.max(cast, kind === 'staff' ? atk : 0);          // casting / staff: both arms up and forward
+    lx += up * 1.7; rx += up * 1.7; lz -= up * 0.55; rz += up * 0.55; le += up * 0.5; re += up * 0.5;
+    lx += roll * 1.3; rx += roll * 1.3; le += roll * 0.9; re += roll * 0.9;
+    lx -= hit * 0.5; rx -= hit * 0.5;
+    this._bone('leftUpperArm', lx, ly, lz + 0.04 * br);
+    this._bone('rightUpperArm', rx, ry, rz - 0.04 * br);
+    this._bone('leftLowerArm', 0, -le, 0);
+    this._bone('rightLowerArm', 0, re, 0);
+    // ---- legs: thighs swing, knees flex while the leg travels forward
+    const crouch = roll * 1.25;
+    const kneeL = Math.max(0, c) * 0.95 * (0.6 + 0.4 * run), kneeR = Math.max(0, -c) * 0.95 * (0.6 + 0.4 * run);
+    this._bone('leftUpperLeg', s * (0.62 + 0.18 * run) + crouch, 0, 0);
+    this._bone('rightUpperLeg', -s * (0.62 + 0.18 * run) + crouch, 0, 0);
+    this._bone('leftLowerLeg', -(kneeL + roll * 1.7), 0, 0);
+    this._bone('rightLowerLeg', -(kneeR + roll * 1.7), 0, 0);
+    this._bone('leftFoot', Math.max(0, -c) * 0.3 * w, 0, 0);
+    this._bone('rightFoot', Math.max(0, c) * 0.3 * w, 0, 0);
   }
   dispose() { this.model.traverse((o) => { if (o.geometry && !o.userData.shared) { /* geometry is shared with the template */ } }); }
 }

@@ -7,6 +7,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { setMaxAnisotropy } from './assets.js';
 import { gfxOptions } from '../world/actor3d.js';
+import { isMobile } from './device.js';
 
 const TiltShift = {
   uniforms: { tDiffuse: { value: null }, focus: { value: 0.5 }, band: { value: 0.22 }, amount: { value: 1.6 }, aspect: { value: 1 }, texel: { value: new THREE.Vector2(1 / 1280, 1 / 720) } },
@@ -47,13 +48,19 @@ const Grade = {
 export class Gfx {
   constructor(canvas) {
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', alpha: false });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: isMobile, powerPreference: 'high-performance', alpha: false });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     setMaxAnisotropy(Math.min(8, this.renderer.capabilities.getMaxAnisotropy()));
-    this.quality = 'high';
+    this.quality = isMobile ? 'low' : 'high';
+    // 'low' renders straight to the screen (no composer): fade / vignette are CSS overlays
+    this.fadeEl = document.createElement('div');
+    this.fadeEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;background:#000;opacity:0;z-index:3';
+    this.vigEl = document.createElement('div');
+    this.vigEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.45) 100%)';
+    document.body.append(this.vigEl, this.fadeEl);
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(30, 16 / 9, 0.1, 200);
     this._build();
@@ -84,7 +91,9 @@ export class Gfx {
     this.renderer.shadowMap.enabled = q !== 'low';
     this.composer.renderTarget1.samples = hi ? 4 : 0;
     this.composer.renderTarget2.samples = hi ? 4 : 0;
-    this.renderer.setPixelRatio(q === 'low' ? 1 : Math.min(devicePixelRatio || 1, 2));
+    this.direct = q === 'low';
+    this.fadeEl.style.display = this.vigEl.style.display = this.direct ? '' : 'none';
+    this.renderer.setPixelRatio(q === 'low' ? 1 : Math.min(devicePixelRatio || 1, q === 'medium' ? 1.5 : 2));
     this.resize();
   }
   setScene(scene, camera) { this.renderPass.scene = scene; this.renderPass.camera = camera; this.scene = scene; this.camera = camera; this.resize(); }
@@ -98,18 +107,18 @@ export class Gfx {
     if (this.camera && this.camera.isPerspectiveCamera) { this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
     this.w = w; this.h = h;
   }
-  set fade(v) { this.grade.uniforms.fade.value = v; }
+  set fade(v) { this.grade.uniforms.fade.value = v; this.fadeEl.style.opacity = v; }
   get fade() { return this.grade.uniforms.fade.value; }
-  setFadeColor(hex) { this.grade.uniforms.fadeColor.value.set(hex); }
+  setFadeColor(hex) { this.grade.uniforms.fadeColor.value.set(hex); this.fadeEl.style.background = '#' + new THREE.Color(hex).getHexString(); }
   setGrade({ tint, sat, vig, focus, band, amount } = {}) {
     if (tint !== undefined) this.grade.uniforms.tint.value.set(tint);
     if (sat !== undefined) this.grade.uniforms.sat.value = sat;
-    if (vig !== undefined) this.grade.uniforms.vig.value = vig;
+    if (vig !== undefined) { this.grade.uniforms.vig.value = vig; this.vigEl.style.background = `radial-gradient(ellipse at center,rgba(0,0,0,0) 50%,rgba(0,0,0,${Math.min(0.75, vig * 1.1).toFixed(2)}) 100%)`; }
     if (focus !== undefined) this.tilt.uniforms.focus.value = focus;
     if (band !== undefined) this.tilt.uniforms.band.value = band;
     if (amount !== undefined) this.tilt.uniforms.amount.value = amount;
   }
-  render() { this.composer.render(); }
+  render() { if (this.direct) this.renderer.render(this.scene, this.camera); else this.composer.render(); }
   /** project world position to CSS pixels */
   project(v3, out = new THREE.Vector3()) {
     out.copy(v3).project(this.camera);

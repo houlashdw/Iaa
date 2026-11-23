@@ -10,6 +10,8 @@ import { Vfx } from './vfx.js';
 import { Hud } from './hud.js';
 import { moveOf, hotbar, BASIC, STAFF_ELEMENT, elColor } from './moves.js';
 import { SKILLS, STATUS } from '../data/skills.js';
+import { isMobile } from '../core/device.js';
+import { gfxOptions } from '../world/actor3d.js';
 import { ITEMS, itemInfo } from '../data/items.js';
 import { CHARS } from '../data/characters.js';
 import { ENEMIES, ZONES } from '../data/enemies.js';
@@ -84,7 +86,7 @@ export class Combat {
     if (!table) return;
     await Promise.all([...new Set(table.flatMap(([, ids]) => ids.map((id) => ENEMIES[id].sprite)))].map((k) => loadChar(k)));
     const cells = this._reachable();
-    const n = clamp(Math.round(cells.length / 120), 2, 5);
+    const n = clamp(Math.round(cells.length / 120), 2, isMobile ? 3 : 5);
     const spots = [];
     const ex = (def.exits || []).map((e) => [e.rect[0] + e.rect[2] / 2, e.rect[1] + e.rect[3] / 2]);
     const trg = (def.triggers || []).map((t) => t.rect);
@@ -826,6 +828,16 @@ export class Combat {
     const F = this.F, G = this.G;
     if (!F.active || !this.world) return;
     this.fx.update(rdt); this.vfx.update(rdt);
+    this.fx.lamp.visible = !gfxOptions.lowFx;
+    // enemy models: animate the ones that are close, hide / freeze the rest (phones draw very little at a time)
+    const far = isMobile ? 26 : 44;
+    for (const m of this.mobs) {
+      const a = m.actor, d = Math.hypot(a.position.x - F.pos.x, a.position.z - F.pos.z);
+      const vis = d < far || m.engaged;
+      if (a.group.visible !== vis) a.group.visible = vis;
+      a.frozen = !vis;
+      a.update(rdt);
+    }
     // sync HUD
     const vis = this.hudVisible();
     this.hud.show(vis);

@@ -28,7 +28,7 @@ crosses five regions to mend the sky:
 
 | | |
 |---|---|
-| Move / sprint | `WASD` / `Shift` · touch devices get an on‑screen stick |
+| Move / sprint | `WASD` / `Shift` · phones: floating stick on the left (push to the rim to sprint) |
 | Camera | mouse (click the game once to capture it, `Esc` releases) · or arrow keys · touch: drag the right side |
 | Attack (combo) | left click / `J` (hold to keep attacking) |
 | Skills | `1`–`5` — each hero has five skill slots that unlock as they level |
@@ -40,6 +40,10 @@ crosses five regions to mend the sky:
 
 Red zones on the ground are enemy attacks about to land — step out of them. Enemies roam each area; walk up to them to fight.
 Progress auto‑saves on every area change, and you can save to 3 slots from the menu. Difficulty / graphics / volume are under **Settings**.
+
+**Phones:** open the file in landscape. Stick on the left, big ⚔ attack button bottom‑right with the skill buttons (1‑5), dodge ⤼ and
+Burst ★ around it, ✦ appears when you stand next to someone to talk, ⇄ switches hero, ☰ opens the menu, drag the right side to turn the camera.
+Phones start on the *Low* graphics preset (no post‑processing, no outlines, fewer enemies); change it under Settings → Graphics.
 
 ## Where the art comes from (nothing visual is drawn by code)
 

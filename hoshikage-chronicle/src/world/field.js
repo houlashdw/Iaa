@@ -11,6 +11,7 @@ import { MAPS } from '../data/maps.js';
 import { ZONES } from '../data/enemies.js';
 import { rand, clamp, tween, easeInOut, damp } from '../core/util.js';
 import { Combat } from '../combat/combat.js';
+import { isMobile } from '../core/device.js';
 import { h, root } from '../ui/ui.js';
 import { itemInfo } from '../data/items.js';
 
@@ -230,7 +231,7 @@ export class Field {
   }
 
   // ------------------------------------------------------------ prompt
-  hidePrompt() { this.prompt.classList.add('hidden'); this.target = null; }
+  hidePrompt() { this.prompt.classList.add('hidden'); this.target = null; document.body.classList.remove('canint'); }
   _updatePrompt() {
     let best = null, bd = 1e9;
     const f = this.player.facingYaw, fx = Math.sin(f), fz = Math.cos(f);
@@ -244,6 +245,7 @@ export class Field {
       if (d < bd) { bd = d; best = t; }
     }
     this.target = best;
+    document.body.classList.toggle('canint', !!best);
     if (!best) { this.prompt.classList.add('hidden'); return; }
     const top = new THREE.Vector3(best.x, (best.actor ? best.actor.height : 1) + 0.35, best.z);
     const p = this.G.gfx.project(top);
@@ -257,6 +259,7 @@ export class Field {
     if (!this.active) return;
     this.t += dt;
     const cb = this.combat;
+    document.body.classList.toggle('uimodal', input.modal);   // touch overlays step aside for menus / dialogue
     const fighting = !!cb.scripted;                       // a story fight runs inside a busy event: the player is in control again
     const free = (!this.busy || fighting) && !input.modal && !this.G.paused && !cb.resultBusy && !cb.eventBusy;
     const world = this.world;
@@ -307,7 +310,12 @@ export class Field {
   _finish(dt) {
     const world = this.world;
     for (const a of this.party) a.update(dt);
-    for (const n of this.npcs) n.actor.update(dt);
+    const far = isMobile ? 26 : 44, pp = this.player.position;
+    for (const n of this.npcs) {
+      const near = Math.hypot(n.x - pp.x, n.z - pp.z) < far;
+      n.actor.group.visible = near && !n.hidden; n.actor.frozen = !near;
+      n.actor.update(dt);
+    }
     for (const c of this.chests) c.mesh.position.y = 0;
     world.setFocus(this._focus());
     world.update(dt);

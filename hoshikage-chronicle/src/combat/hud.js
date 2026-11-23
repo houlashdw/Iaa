@@ -84,6 +84,8 @@ export class Hud {
           return mk('skill' + (i + 1), i + 1, sk.name, GLYPH[sk.kind === 'heal' ? 'heal' : sk.kind === 'buff' ? 'buff' : sk.kind === 'debuff' ? 'debuff' : sk.fx] || '✦', `<em>${sk.mp}</em>`);
         }).join('') + mk('dodge', 'Space', 'Dodge', '⤼', '', 'dodge') + mk('burst', 'R', 'Burst', '★', '', 'burst');
       this.slots = [...box.querySelectorAll('.sk')].map((el) => ({ el, a: el.dataset.a, cd: el.querySelector('.cd') }));
+      this.tbtn = {}; document.querySelectorAll('#touch [data-a^=skill],#touch .tbburst').forEach((b) => (this.tbtn[b.dataset.a] = b));
+      hb.forEach((sk2, i) => { const b = this.tbtn['skill' + (i + 1)]; if (!b) return; const u = b.querySelector('u'); if (sk2.locked) { u.textContent = '🔒'; b.classList.add('locked'); } else { b.classList.remove('locked'); const sd = SKILLS[sk2.id]; u.textContent = GLYPH[sd.kind === 'heal' ? 'heal' : sd.kind === 'buff' ? 'buff' : sd.kind === 'debuff' ? 'debuff' : sd.fx] || '✦'; } });
     }
     for (const s of this.slots) {
       if (!s.a) continue;
@@ -95,6 +97,8 @@ export class Hud {
       else if (s.a === 'burst') { k = cb.star >= 100 ? 0 : 1 - cb.star / 100; s.el.classList.toggle('ready', cb.star >= 100); }
       s.cd.style.transform = `scaleY(${k})`;
       s.el.classList.toggle('off', off);
+      const tb = this.tbtn && this.tbtn[s.a];
+      if (tb) { tb.style.setProperty('--cd', k); tb.classList.toggle('off', off); if (s.a === 'burst') tb.classList.toggle('ready', cb.star >= 100); }
     }
     this.q('.bt-star .sfill').style.width = cb.star + '%';
     this.q('.bt-star').classList.toggle('ready', cb.star >= 100);

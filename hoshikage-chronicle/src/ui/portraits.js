@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { loadChar } from '../core/chars.js';
 import { Actor3D } from '../world/actor3d.js';
+import { isMobile } from '../core/device.js';
 
 const PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 let gfx = null, scene = null;
@@ -24,9 +25,9 @@ async function render(key, kind) {
   await loadChar(key);
   if (!scene) buildScene();
   const face = kind === 'face';
-  const W = face ? 160 : 512, H = face ? 160 : 768;
+  const W = face ? (isMobile ? 128 : 160) : (isMobile ? 360 : 512), H = face ? (isMobile ? 128 : 160) : (isMobile ? 540 : 768);
   const r = gfx.renderer;
-  const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4 });
+  const rt = new THREE.WebGLRenderTarget(W, H, { samples: isMobile ? 0 : 4 });
   rt.texture.colorSpace = THREE.SRGBColorSpace;
   const a = new Actor3D({ height: 1.8, tex: { front: key }, tint: 0xffffff, shadow: false, facing: 'down' });
   a.update(0.016); a.update(0.016);

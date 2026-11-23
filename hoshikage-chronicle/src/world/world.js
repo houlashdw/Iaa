@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MapBuilder } from './mapbuilder.js';
 import { damp } from '../core/util.js';
+import { gfxOptions } from './actor3d.js';
 
 export const MOODS = {
   day:    { bg: 0xc4e6f7, fog: [0xc4e6f7, 34, 80], hemi: [0xe8f6ff, 0x8a9a62, 1.35], sun: [0xfff0d2, 2.3], dir: [-0.5, 0.8, 0.6], grade: { tint: 0xffffff, sat: 1.12, vig: 0.26 }, sprite: 0xffffff },
@@ -124,7 +125,10 @@ export class World {
     if (b) {
       b.update(this.time);
       const cand = b.lights.map((l) => ({ l, d: (l.x - this.focus.x) ** 2 + (l.z - this.focus.z) ** 2 })).sort((a, c) => a.d - c.d);
+      const maxL = gfxOptions.lowFx ? 2 : this.pool.length;
       this.pool.forEach((p, i) => {
+        if (i >= maxL) { p.visible = false; return; }
+        p.visible = true;
         const c = cand[i];
         if (!c) { p.intensity = 0; return; }
         const l = c.l;

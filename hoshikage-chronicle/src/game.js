@@ -1,7 +1,9 @@
 // Game orchestrator: wires renderer, field, battle, UI, audio and the story-script API (`G`).
 import * as THREE from 'three';
 import { Gfx } from './core/gfx.js';
-import { preload, loadSprite } from './core/assets.js';
+import { preload } from './core/assets.js';
+import { loadChar } from './core/chars.js';
+import { initPortraits, ensurePortrait } from './ui/portraits.js';
 import { input } from './core/input.js';
 import { audio } from './core/audio.js';
 import { World } from './world/world.js';
@@ -31,7 +33,7 @@ G.say = async (lines, opts = {}) => {
     let sp;
     if (!who || who === '*') sp = { name: '', sprite: null };
     else sp = SPEAKERS[who] || { name: who, sprite: null, side: 'right' };
-    if (sp.sprite) await loadSprite(sp.sprite).catch(() => {});
+    if (sp.sprite) await ensurePortrait(sp.sprite, 'full').catch(() => {});
     await UI.dialogue.say(sp, text, opts);
   }
 };
@@ -41,7 +43,7 @@ G.flag = flag; G.set = setFlag;
 G.give = (id, n = 1) => { addItem(id, n); const it = itemInfo(id); UI.toast(`Received <b>${it.name}</b>${n > 1 ? ' ×' + n : ''}`, 'good'); audio.sfx('gem', { vol: 0.6 }); };
 G.gold = (n) => { state.gold += n; UI.toast(`${n >= 0 ? '+' : ''}${n} G`, 'gold'); if (n > 0) audio.sfx('coin', { vol: 0.6 }); };
 G.join = async (id, o = {}) => {
-  await loadSprite(CHARS[id].sprite);
+  await loadChar(CHARS[id].sprite);
   addChar(id, o);
   if (!state.party.includes(id) && state.party.length < 4) state.party.push(id);
   audio.jingle('levelup');
@@ -90,7 +92,7 @@ G.startBattle = async (opts) => {
     throw e;
   }
 };
-G.bossBattle = (enemies, o = {}) => G.startBattle({ enemies, stage: o.stage || G.field.def.stage || 'field', canFlee: false, music: o.music || 'battle_theme_a', events: o.events || [], ...o });
+G.bossBattle = (enemies, o = {}) => G.startBattle({ enemies, stage: o.stage || G.field.def.stage || 'field', canFlee: false, music: o.music || 'boss_theme', events: o.events || [], ...o });
 
 // ---------------------------------------------------------------- settings / save
 G.saveSettings = () => {
@@ -125,7 +127,7 @@ G.loadGame = async (n) => {
   if (!loadSlot(n)) { UI.toast('Could not load that save.'); return; }
   G.title.hide();
   await G.fadeTo(1, 400);
-  await Promise.all(Object.keys(state.roster).map((id) => loadSprite(CHARS[id].sprite)));
+  await Promise.all(Object.keys(state.roster).map((id) => loadChar(CHARS[id].sprite)));
   G.mode = 'field';
   await G.field.enter(state.map.id, state.map.x, state.map.z, state.map.dir);
   await G.fadeTo(0, 500);
@@ -139,7 +141,7 @@ G.debugStart = async (mapId, x, z, { party = ['haru'], lv = 1, flags = {}, items
   for (const [k, v] of Object.entries(flags)) setFlag(k, v);
   for (const [k, v] of Object.entries(items)) addItem(k, v);
   state.gold += gold;
-  await Promise.all(party.map((id) => loadSprite(CHARS[id].sprite)));
+  await Promise.all(party.map((id) => loadChar(CHARS[id].sprite)));
   input.stack.length = 0; G.title.hide(); G.mode = 'field';
   await G.field.enter(mapId, x, z, 'up');
   G.gfx.fade = 0; audio.unlock();
@@ -158,6 +160,7 @@ export async function boot() {
   else man = await (await fetch((window.__ASSET_BASE__ || 'assets/') + 'manifest.json')).json();
   const fill = loading.querySelector('.lfill');
   await preload(man, (p) => (fill.style.width = Math.round(p * 100) + '%'));
+  initPortraits(G.gfx);
   G.world = new World(G.gfx);
   G.field = new Field(G);
   G.battle = new Battle(G);

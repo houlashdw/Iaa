@@ -1,4 +1,4 @@
-3D props (assets/models), surface textures (assets/tex) and sound effects / battle theme (assets/audio) are
+3D props (assets/models), creature models (assets/chars/*.glb), surface textures (assets/tex) and sound effects (assets/audio) are
 optimized copies of CC0 1.0 (public domain) third-party art, as bundled and licence-verified in the npm package
 @netforge/asset-library-files (selection / optimization copyright (c) 2026 NetNet Capital Management, MIT).
 Crediting is not required by CC0; we credit anyway. Notice reproduced from that package:

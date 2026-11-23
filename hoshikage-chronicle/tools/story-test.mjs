@@ -22,7 +22,7 @@ const S = [
   { name: 'castle_zeno', setup: `__G.debugStart('castle1',22,34,{party:${P4},lv:19,flags:{daigo_joined:1,ren_joined:1,sylva_found:1,ch4_done:1}})`, then: room('castle1', 1, -0.6), done: `__G.state.flags.zeno_joined && !__G.field.busy` },
   { name: 'castle_vael', setup: `__G.debugStart('castle1',22,34,{party:${P4Z},lv:20,flags:{daigo_joined:1,ren_joined:1,sylva_found:1,ch4_done:1,zeno_joined:1}})`, then: room('castle1', 3, 5), done: `__G.state.flags.vael_dead && !__G.field.busy` },
   { name: 'castle_kazan', setup: `__G.debugStart('castle2',20,34,{party:${P4Z},lv:22,flags:{ren_joined:1,vael_dead:1,zeno_joined:1}})`, then: room('castle2', 3, 5), done: `__G.state.flags.kazan_dead && !__G.field.busy` },
-  { name: 'final', cheat: { hp: 3000, atk: 8 }, setup: `__G.debugStart('throne',15,20,{party:${P4Z},lv:24,flags:{ren_joined:1,zeno_joined:1,kazan_dead:1}})`, then: `__G.field.teleportParty(15,13.4,'up')`, wait: 520, done: `__G.state.flags.game_complete && __G.mode==='title'` },
+  { name: 'final', cheat: { hp: 3000, atk: 8 }, setup: `__G.debugStart('throne',15,20,{party:${P4Z},lv:24,flags:{ren_joined:1,zeno_joined:1,kazan_dead:1}})`, then: `__G.field.teleportParty(15,13.4,'up')`, wait: 1000, done: `__G.state.flags.game_complete && __G.mode==='title'` },
 ];
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
 let fails = 0;

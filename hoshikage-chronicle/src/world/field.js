@@ -1,7 +1,8 @@
 // Exploration mode: walking, collision, NPCs, chests, exits, triggers and random encounters.
 import * as THREE from 'three';
-import { Actor } from './actors.js';
-import { model, loadSprite } from '../core/assets.js';
+import { Actor3D as Actor } from './actor3d.js';
+import { model } from '../core/assets.js';
+import { loadChar } from '../core/chars.js';
 import { input } from '../core/input.js';
 import { audio } from '../core/audio.js';
 import { state, flag, setFlag, addItem } from '../state.js';
@@ -50,7 +51,7 @@ export class Field {
     this.hidePrompt();
     // prepare sprites for NPCs (lazy-loaded)
     const keys = (def.npcs || []).filter((n) => !n.cond || n.cond()).map((n) => n.sprite);
-    await Promise.all(keys.map((k) => loadSprite(k)));
+    await Promise.all([...keys, ...state.party.slice(0, 4).map((id) => CHARS[id].sprite)].map((k) => loadChar(k)));
     // remove everything the previous map left in the scene
     for (const n of this.npcs) { this.world.remove(n.actor.group); n.actor.dispose(); }
     for (const c of this.chests) this.world.remove(c.mesh);
@@ -110,7 +111,7 @@ export class Field {
     const ids = state.party.slice(0, 4);
     const mk = (id) => {
       const c = CHARS[id];
-      const a = new Actor({ height: c.height, tex: { front: c.sprite, back: c.sprite + '_back', right: c.sprite + '_right' }, tint: this.world.mood.sprite });
+      const a = new Actor({ height: c.height, tex: { front: c.sprite }, tint: this.world.mood.sprite });
       a.id = id;
       this.world.add(a.group);
       return a;
@@ -160,7 +161,7 @@ export class Field {
     if (t.kind === 'chest') return this.openChest(t);
     const run = t.def.talk || t.def.run;
     if (!run) return;
-    if (t.kind === 'npc') { const dx = this.pos.x - t.x; const a = t.actor; if (Math.abs(dx) > 0.2) a.setFlip(dx > 0 ? 1 : -1); }
+    if (t.kind === 'npc') t.actor.faceToward(this.pos.x, this.pos.z);
     await this.runEvent(run);
   }
   async runEvent(fn) {
@@ -305,7 +306,7 @@ export class Field {
         else {
           const nx = n.x + (dx / l) * 1.0 * dt, nz = n.z + (dz / l) * 1.0 * dt;
           const ok = !this.b.isBlocked(Math.floor(nx), Math.floor(nz)) && Math.hypot(nx - this.pos.x, nz - this.pos.z) > 0.8;
-          if (ok) { n.x = nx; n.z = nz; n.actor.position.set(nx, 0, nz); n.actor.moving = true; if (Math.abs(dx) > 0.01) n.actor.setFlip(dx > 0 ? 1 : -1); } else n.tgt = null;
+          if (ok) { n.x = nx; n.z = nz; n.actor.position.set(nx, 0, nz); n.actor.moving = true; n.actor.faceVec(dx, dz); } else n.tgt = null;
         }
       }
     }
@@ -383,7 +384,7 @@ export class Field {
     const sx = p.x, sz = p.z;
     actor.moving = true;
     if (actor.keys && actor.keys.right) actor.setDir(Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 'right' : 'left') : (dz > 0 ? 'down' : 'up'));
-    else if (Math.abs(dx) > 0.01) actor.setFlip(dx > 0 ? 1 : -1);
+    else actor.faceVec(dx, dz);
     await tween(ms, (t) => { const k = t; p.x = sx + dx * k; p.z = sz + dz * k; onMove && onMove(p.x, p.z); });
     actor.moving = false;
   }

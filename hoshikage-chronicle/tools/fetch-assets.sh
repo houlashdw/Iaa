@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
 # Downloads the third-party art/audio packages from the npm registry into .cache/src/<pkg>.
-# Everything the game shows or plays is a real file coming out of these packages (see CREDITS.md).
+# CC0 props, surface textures and sound effects + fonts. Characters (VRoid VRM) and music come from
+# tools/fetch-vrm.sh and tools/fetch-music.sh (OpenGameArt). Everything the game shows or plays is a real file (see CREDITS.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CACHE=.cache
 mkdir -p "$CACHE/tgz" "$CACHE/src"
 PKGS=(
-  @sprite-foundry/fantasy-heroes-hd
-  @sprite-foundry/fantasy-villains-hd
-  @sprite-foundry/goblin-warband-hd
-  @sprite-foundry/pirate-raiders-hd
-  @sprite-foundry/townsfolk-hd
   @netforge/asset-library-files
   @fontsource/zen-maru-gothic
   @fontsource/cinzel

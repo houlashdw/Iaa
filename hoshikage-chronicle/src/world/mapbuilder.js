@@ -94,7 +94,7 @@ export class MapBuilder {
   _mat(texName, tint = 0xffffff, opts = {}) {
     const key = `${texName}|${tint}|${opts.double ? 'd' : 's'}|${opts.emissive || 0}|${opts.opacity || 1}`;
     if (this.matCache.has(key)) return this.matCache.get(key);
-    const m = new THREE.MeshLambertMaterial({ map: texName ? surface(texName) : null, color: this._col(tint), side: opts.double ? THREE.DoubleSide : THREE.FrontSide });
+    const m = new THREE.MeshToonMaterial({ map: texName ? surface(texName) : null, color: this._col(tint), side: opts.double ? THREE.DoubleSide : THREE.FrontSide });
     if (opts.emissive) { m.emissive = new THREE.Color(opts.emissive); m.emissiveIntensity = opts.emissiveIntensity ?? 1; }
     if (opts.opacity !== undefined && opts.opacity < 1) { m.transparent = true; m.opacity = opts.opacity; }
     this.matCache.set(key, m);
@@ -111,7 +111,7 @@ export class MapBuilder {
     const W = this.w + margin * 2, H = this.h + margin * 2;
     const g = new THREE.PlaneGeometry(W, H);
     g.rotateX(-Math.PI / 2);
-    const m = new THREE.MeshLambertMaterial({ map: tiled(surface(tex), W / tile, H / tile), color: this._col(tint) });
+    const m = new THREE.MeshToonMaterial({ map: tiled(surface(tex), W / tile, H / tile), color: this._col(tint) });
     const mesh = new THREE.Mesh(g, m);
     mesh.position.set(this.w / 2, 0, this.h / 2);
     mesh.receiveShadow = true;
@@ -121,7 +121,7 @@ export class MapBuilder {
   patch(tex, x, z, w, d, { tint = 0xffffff, tile = 2, y = 0.012 } = {}) {
     const g = new THREE.PlaneGeometry(w, d);
     g.rotateX(-Math.PI / 2);
-    const m = new THREE.MeshLambertMaterial({ map: tiled(surface(tex), w / tile, d / tile), color: this._col(tint), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const m = new THREE.MeshToonMaterial({ map: tiled(surface(tex), w / tile, d / tile), color: this._col(tint), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     const mesh = new THREE.Mesh(g, m);
     mesh.position.set(x + w / 2, y, z + d / 2);
     mesh.receiveShadow = true;

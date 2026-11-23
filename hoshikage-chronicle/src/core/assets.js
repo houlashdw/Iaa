@@ -4,12 +4,14 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+// organic props are smooth-shaded so trees / bushes / rocks read as rounded, stylised shapes instead of faceted low-poly
+const SMOOTH = /^(tree_|bush|rock_|mushroom|stump|log|flower|pumpkin|crystal|gem|fish)/;
 
 const EMBED = window.__EMBED__ || null;
 const BASE = window.__ASSET_BASE__ || 'assets/';
 export const url = (p) => (EMBED ? EMBED[p] : BASE + p);
-export const spriteUrl = (key) => url(`sprites/${key}.webp`);
-export const faceUrl = (key) => url(`faces/${key}.webp`);
 
 const texCache = new Map();
 const imgLoader = new THREE.ImageLoader();
@@ -35,12 +37,11 @@ export function loadTexture(path, opts = {}) {
   texCache.set(k, p);
   return p;
 }
-export const loadSprite = (key) => loadTexture(`sprites/${key}.webp`).then((t) => (loadedSprites[key] = t));
 
 /** Tiled surface texture clone with its own repeat (shares the GPU upload). */
 const surfaceBase = {};
 export async function loadSurface(name) {
-  if (!surfaceBase[name]) surfaceBase[name] = await loadTexture(`tex/${name}.png`, { repeat: true });
+  if (!surfaceBase[name]) surfaceBase[name] = await loadTexture(`tex/${name}.webp`, { repeat: true });
   return surfaceBase[name];
 }
 export function tiled(tex, rx, ry) {
@@ -60,6 +61,22 @@ const PALETTE = {
   metalRed: 0xa84a3a, metal: 0xc09060, metalDark: 0x6a4a30, dark: 0x3b2c24, wood: 0xb98351, woodDark: 0x8c5e3a,
   colorRed: 0xd9505a, crystal: 0x66f0d0, rock: 0x8f8998, rockTrack: 0xa49ca8,
 };
+/** Weld coincident vertices and recompute normals so flat-shaded low-poly shapes read as rounded.
+ *  The meshopt-quantised sources use interleaved Int16 buffers, so they are unpacked to plain floats first;
+ *  on any failure the original geometry (with its own normals) is returned untouched. */
+function smoothed(src) {
+  try {
+    const pos = src.attributes.position;
+    const arr = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) { arr[i * 3] = pos.getX(i); arr[i * 3 + 1] = pos.getY(i); arr[i * 3 + 2] = pos.getZ(i); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    if (src.index) g.setIndex(new THREE.BufferAttribute(new Uint32Array(src.index.array), 1));
+    const m = mergeVertices(g, 1e-3);
+    m.computeVertexNormals();
+    return m;
+  } catch (e) { console.warn('smooth failed', e); return src; }
+}
 const modelCache = new Map();
 const loadedModels = {};
 export function loadModel(name) {
@@ -71,8 +88,9 @@ export function loadModel(name) {
         if (!o.isMesh) return;
         o.castShadow = true;
         o.receiveShadow = true;
+        if (SMOOTH.test(name) && o.geometry && !o.isSkinnedMesh) o.geometry = smoothed(o.geometry);
         const conv = (m) => {
-          const n = new THREE.MeshLambertMaterial({ color: m.color ? m.color.clone() : 0xffffff, map: m.map || null,
+          const n = new THREE.MeshToonMaterial({ color: m.color ? m.color.clone() : 0xffffff, map: m.map || null,
             transparent: m.transparent, opacity: m.opacity, side: m.side });
           if (m.name) n.name = m.name;
           if (PALETTE[m.name] !== undefined) n.color.setHex(PALETTE[m.name]);
@@ -104,8 +122,6 @@ export const surface = (name) => {
   if (!surfaceBase[name]) throw new Error('surface not preloaded: ' + name);
   return surfaceBase[name];
 };
-const loadedSprites = {};
-export const spriteTex = (key) => loadedSprites[key];
 
 export async function loadBuffer(path) {
   const r = await fetch(url(path));
@@ -117,9 +133,6 @@ export async function preload(manifest, onProgress) {
   const jobs = [];
   for (const t of manifest.textures) jobs.push(loadSurface(t));
   for (const m of manifest.models) jobs.push(loadModel(m));
-  for (const k of Object.keys(manifest.party)) {
-    for (const s of ['', '_back', '_right', '_fl']) jobs.push(loadSprite(k + s));
-  }
   let done = 0;
   await Promise.all(jobs.map((j) => j.then(() => onProgress && onProgress(++done / jobs.length))));
 }

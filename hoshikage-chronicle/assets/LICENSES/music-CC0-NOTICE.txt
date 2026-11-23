@@ -1,0 +1,10 @@
+Music (assets/audio/*.mp3 for title, town, cave, castle, boss_theme, final_boss, battle_theme_a) - re-encoded, loudness-normalised
+copies of CC0 tracks from OpenGameArt (each page's licence verified as CC0 1.0):
+  "The Field Of Dreams" (anonymous)                       https://opengameart.org/content/the-field-of-dreams        -> title screen
+  "Town Theme RPG" by Bonsaiheldin                        https://opengameart.org/content/town-theme-rpg             -> villages
+  "Crystal Cave (song18)" by messersm                     https://opengameart.org/content/crystal-cave-song18        -> caverns
+  "Doomed" by Alexander Ehlers  (Free Music Pack)         https://opengameart.org/content/free-music-pack            -> castle
+  "Waking the devil" by Alexander Ehlers (Free Music Pack)                                                           -> final boss
+  "Epic Boss Battle" by Juhani Junkala                    https://opengameart.org/content/boss-battle-music          -> boss fights
+  "Battle Theme A" by cynicmusic (The Cynic Project)      https://opengameart.org/content/battle-theme-a             -> battles
+Forest, shrine, port and calm / sad cut-scene themes are generated live by src/core/music.js (Web Audio).

@@ -1,6 +1,6 @@
 // Bundles src/ with esbuild and produces:
 //   dist/game.js + dist/dev.html            (loads assets/ from disk - for development)
-//   dist/hoshikage-chronicle.html           (ONE self-contained file: code + css + fonts + every sprite/model/sound)
+//   dist/hoshikage-chronicle.html           (ONE self-contained file: code + css + fonts + every 3D model / texture / sound)
 import esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,7 +44,7 @@ if (!noSingle) {
     const p = path.join(d, f.name);
     if (f.isDirectory()) { if (f.name !== 'fonts' && f.name !== 'LICENSES') walk(p); continue; }
     const rel = path.relative(path.join(root, 'assets'), p).split(path.sep).join('/');
-    const mime = { webp: 'image/webp', png: 'image/png', glb: 'model/gltf-binary', ogg: 'audio/ogg', mp3: 'audio/mpeg', json: 'application/json' }[rel.split('.').pop()];
+    const mime = { webp: 'image/webp', png: 'image/png', glb: 'model/gltf-binary', vrm: 'model/gltf-binary', ogg: 'audio/ogg', mp3: 'audio/mpeg', json: 'application/json' }[rel.split('.').pop()];
     embed[rel] = `data:${mime};base64,${b64(p)}`;
   } };
   walk(path.join(root, 'assets'));

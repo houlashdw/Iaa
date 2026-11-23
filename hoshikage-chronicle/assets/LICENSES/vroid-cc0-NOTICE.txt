@@ -1,0 +1,12 @@
+Character models (assets/chars/*.vrm) are optimized copies (textures re-encoded to WebP, blend shapes removed, nothing else
+changed) of the "VRoid Studio CC0 models" published on OpenGameArt:
+  https://opengameart.org/content/vroid-studio-cc0-models
+Released by the VRoid Project / pixiv Inc. under CC0 1.0 Universal (public domain dedication):
+  https://creativecommons.org/publicdomain/zero/1.0/
+Models used: VRoid Studio base_male, base_female, AvatarSample D / D-Darkness / E / F / G, Sakurada Fumiriya, Sendagaya Shino.
+Crediting is not required by CC0; we credit anyway.
+
+Creature models (assets/chars/*.glb: orc_brute, frog, demon, ghost, skeleton, wolf_cartoon) are Quaternius CC0 1.0 models,
+see netforge-CC0-NOTICE.txt.
+
+The VRM loader (@pixiv/three-vrm) is MIT licensed (c) pixiv Inc.

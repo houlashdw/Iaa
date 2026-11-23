@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { MapBuilder } from './mapbuilder.js';
-import { camState } from './actors.js';
 import { damp } from '../core/util.js';
 
 export const MOODS = {
@@ -32,7 +31,7 @@ export class World {
     for (let i = 0; i < 4; i++) { const l = new THREE.PointLight(0xffffff, 0, 10, 1.6); this.scene.add(l); this.pool.push(l); }
     this.mapGroup = null;
     this.builder = null;
-    this.pitch = 0.82; this.dist = 17; this.yaw = 0; this.lookUp = 0;
+    this.pitch = 0.76; this.dist = 14.5; this.yaw = 0; this.lookUp = 0;
     this.focus = new THREE.Vector3();
     this.camTarget = new THREE.Vector3();
     this.mood = MOODS.day;
@@ -76,7 +75,7 @@ export class World {
   async load(def) {
     if (this.mapGroup) { this.scene.remove(this.mapGroup); this._dispose(this.mapGroup); }
     this.setMood(def.mood || 'day');
-    this.pitch = def.pitch || 0.82; this.dist = def.dist || 17; this.lookUp = 0; this.yaw = 0;
+    this.pitch = def.pitch || 0.76; this.dist = def.dist || 14.5; this.lookUp = 0; this.yaw = 0;
     const b = new MapBuilder(def);
     def.build(b);
     await b.finalize();
@@ -122,7 +121,6 @@ export class World {
     this.camera.position.set(this.camTarget.x + sx + Math.sin(this.yaw) * cp * this.dist, this.camTarget.y + sp * this.dist + sy, this.camTarget.z + Math.cos(this.yaw) * cp * this.dist);
     this.camera.lookAt(this.camTarget.x, this.camTarget.y + 0.9 + this.lookUp, this.camTarget.z);
     if (this.sky) this.sky.position.set(this.camera.position.x, 0, this.camera.position.z);
-    camState.tilt = this.pitch * 0.82;
     // sun follows the focus so the shadow box stays on screen
     this.sun.position.copy(this.camTarget).addScaledVector(this.sunDir, 36);
     this.sun.target.position.copy(this.camTarget);

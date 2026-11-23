@@ -6,6 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { setMaxAnisotropy } from './assets.js';
+import { gfxOptions } from '../world/actor3d.js';
 
 const TiltShift = {
   uniforms: { tDiffuse: { value: null }, focus: { value: 0.5 }, band: { value: 0.22 }, amount: { value: 1.6 }, aspect: { value: 1 }, texel: { value: new THREE.Vector2(1 / 1280, 1 / 720) } },
@@ -76,6 +77,7 @@ export class Gfx {
   }
   setQuality(q) {
     this.quality = q;
+    gfxOptions.lowFx = q === 'low';
     const hi = q === 'high';
     this.bloom.enabled = hi;
     this.tilt.enabled = hi;

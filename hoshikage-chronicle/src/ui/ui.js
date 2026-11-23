@@ -1,7 +1,7 @@
 // DOM UI core: dialogue (visual-novel style), choices, banners, toasts and a generic keyboard/mouse list picker.
 import { input } from '../core/input.js';
 import { audio } from '../core/audio.js';
-import { spriteUrl } from '../core/assets.js';
+import { setPortrait } from './portraits.js';
 import { sleep } from '../core/util.js';
 
 export const root = document.getElementById('ui');
@@ -61,7 +61,7 @@ class Dialogue {
   hide() { this.el.classList.add('hidden'); this.visible = false; this.pl.classList.remove('in'); this.pr.classList.remove('in'); this.pl.dataset.key = this.pr.dataset.key = ''; }
   _port(side, key, active) {
     const img = side === 'left' ? this.pl : this.pr;
-    if (key && img.dataset.key !== key) { img.dataset.key = key; img.src = spriteUrl(key); img.classList.remove('in'); void img.offsetWidth; img.classList.add('in'); }
+    if (key && img.dataset.key !== key) { img.dataset.key = key; setPortrait(img, key, 'full'); img.classList.remove('in'); void img.offsetWidth; img.classList.add('in'); }
     if (key) img.classList.toggle('dim', !active);
   }
   /** sp: {name, sprite, side, color} ; text: string */

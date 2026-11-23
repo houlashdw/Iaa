@@ -6,7 +6,7 @@ import { SKILLS, ELEMENTS } from '../data/skills.js';
 import { h, root, esc, bar, pick, toast } from './ui.js';
 import { audio } from '../core/audio.js';
 import { input } from '../core/input.js';
-import { faceUrl, spriteUrl } from '../core/assets.js';
+import { ptImg } from './portraits.js';
 import { sleep } from '../core/util.js';
 
 const STAT_NAMES = [['maxHp', 'HP'], ['maxMp', 'MP'], ['atk', 'ATK'], ['def', 'DEF'], ['mag', 'MAG'], ['res', 'RES'], ['spd', 'SPD']];
@@ -19,7 +19,7 @@ function overlay(cls = '') {
 const card = (id, extra = '') => {
   const r = state.roster[id], s = statsOf(id), c = CHARS[id];
   const hp = (r.hp / s.maxHp) * 100;
-  return `<div class="mc" style="--c:${c.color}"><img src="${faceUrl(c.sprite)}" alt=""><div class="mi"><div class="mn">${esc(c.name)} <small>Lv ${r.lv}</small></div><div class="ms">${esc(c.title)}</div>
+  return `<div class="mc" style="--c:${c.color}">${ptImg(c.sprite, 'face')}<div class="mi"><div class="mn">${esc(c.name)} <small>Lv ${r.lv}</small></div><div class="ms">${esc(c.title)}</div>
     ${bar('hp' + (hp < 30 ? ' low' : ''), hp)}<div class="mnum"><b>${r.hp}</b>/${s.maxHp} HP</div>${bar('mp', (r.mp / s.maxMp) * 100)}<div class="mnum">${r.mp}/${s.maxMp} MP</div>${extra}</div></div>`;
 };
 
@@ -126,7 +126,7 @@ export class Menus {
         const r = state.roster[id];
         const slots = [['weapon', 'Weapon'], ['armor', 'Armor'], ['charm', 'Charm']];
         const cur = statsOf(id);
-        right.innerHTML = `<div class="panel epanel"><div class="ehead"><img src="${faceUrl(CHARS[id].sprite)}" alt=""><div><div class="ptitle">${esc(CHARS[id].name)} <small>Lv ${r.lv}</small></div></div></div>
+        right.innerHTML = `<div class="panel epanel"><div class="ehead">${ptImg(CHARS[id].sprite, 'face')}<div><div class="ptitle">${esc(CHARS[id].name)} <small>Lv ${r.lv}</small></div></div></div>
           <div class="estats">${STAT_NAMES.map(([k, n]) => `<div><span>${n}</span><b>${cur[k]}</b></div>`).join('')}</div><div class="list"></div><div class="desc"></div></div>`;
         const lst = right.querySelector('.list'), desc = right.querySelector('.desc');
         const rows = slots.map(([k, n]) => { const e = EQUIP[r.equip[k]]; const row = h('div', 'row', `<span class="slot">${n}</span><span>${e ? esc(e.name) : '— none —'}</span>`); lst.appendChild(row); return row; });
@@ -166,7 +166,7 @@ export class Menus {
       if (!id) return;
       const c = CHARS[id], r = state.roster[id], s = statsOf(id);
       const known = learned(id);
-      right.innerHTML = `<div class="panel spanel"><div class="shead"><img src="${spriteUrl(c.sprite)}" alt=""><div><div class="ptitle">${esc(c.name)} <small>${esc(c.title)}</small></div><div class="bio">${esc(c.bio)}</div>
+      right.innerHTML = `<div class="panel spanel"><div class="shead">${ptImg(c.sprite, 'full')}<div><div class="ptitle">${esc(c.name)} <small>${esc(c.title)}</small></div><div class="bio">${esc(c.bio)}</div>
         <div class="xp">Lv ${r.lv} · EXP ${r.exp}/${expNeed(r.lv)}${bar('xp', (r.exp / expNeed(r.lv)) * 100)}</div></div></div>
         <div class="estats">${STAT_NAMES.map(([k, n]) => `<div><span>${n}</span><b>${s[k]}</b></div>`).join('')}</div>
         <div class="sklist">${c.learn.map(([lv, sk]) => { const S = SKILLS[sk]; const ok = known.includes(sk); return `<div class="sk${ok ? '' : ' lock'}"><b>${esc(S.name)}</b> <span style="color:${ELEMENTS[S.el].color}">${S.el !== 'none' ? '●' : ''}</span> <small>${ok ? S.mp + ' MP' : 'Lv ' + lv}</small><div>${esc(S.desc)}</div></div>`; }).join('')}

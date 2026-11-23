@@ -1,22 +1,24 @@
 // Title screen: a night scene in the real 3D engine (campfire, party, falling stars) + menu.
 import * as THREE from 'three';
 import { World } from '../world/world.js';
-import { Actor } from '../world/actors.js';
+import { Actor3D as Actor } from '../world/actor3d.js';
+import { loadChar } from '../core/chars.js';
 import { h, root, pick, esc } from './ui.js';
 import { audio } from '../core/audio.js';
 import { lastSlot } from '../state.js';
 
 const CREDITS = `
 <h2>HOSHIKAGE CHRONICLE</h2>
-<p>An HD-2D anime JRPG built with three.js. Every character, prop, texture and sound effect in the game is a real file
-taken from the open-source packages below &mdash; nothing visual is drawn by code.</p>
-<h3>Character art (painted sprites, 8-direction sets)</h3>
-<p><b>Sprite Foundry</b> &mdash; <i>Fantasy Heroes HD, Fantasy Villains HD, Goblin Warband HD, Pirate Raiders HD, Townsfolk HD</i> (MIT licence, npm: <code>@sprite-foundry/*</code>).</p>
-<h3>3D props, surface textures &amp; sound effects (CC0)</h3>
-<p><b>Quaternius</b> and <b>Kenney</b> (low-poly props, Kenney sound packs), <b>Screaming Brain Studios</b> (texture packs), as bundled and licence-verified by
-<code>@netforge/asset-library-files</code> (CC0 1.0).</p>
-<h3>Music</h3>
-<p>Battle theme: <b>&ldquo;Battle Theme A&rdquo; by The Cynic Project / cynicmusic</b> (CC0). Field, town and dungeon themes are generated live by the in-game score engine (Web Audio).</p>
+<p>An HD-2D anime JRPG built with three.js. Every character, prop, texture, song and sound effect is a real file
+from the open sources below &mdash; nothing visual is drawn by code.</p>
+<h3>Characters (3D, cel-shaded)</h3>
+<p><b>VRoid Studio CC0 models</b> by the <b>VRoid Project / pixiv</b> (CC0) &mdash; base avatars, AvatarSample D&ndash;G, Sakurada Fumiriya, Sendagaya Shino. Loader: <code>@pixiv/three-vrm</code> (MIT).</p>
+<h3>Creatures, props, textures &amp; sound effects (CC0)</h3>
+<p><b>Quaternius</b> (rigged creatures, low-poly props), <b>Kenney</b> (sound packs), <b>Screaming Brain Studios</b> (texture packs), as bundled and licence-verified by
+<code>@netforge/asset-library-files</code>.</p>
+<h3>Music (CC0, OpenGameArt)</h3>
+<p><i>The Field Of Dreams</i> (anonymous) &middot; <i>Town Theme RPG</i> by Bonsaiheldin &middot; <i>Crystal Cave</i> by messersm &middot; <i>Doomed</i> &amp; <i>Waking the devil</i> by Alexander Ehlers &middot;
+<i>Epic Boss Battle</i> by Juhani Junkala &middot; <i>Battle Theme A</i> by cynicmusic. Forest, shrine and port themes are generated live by the in-game score engine.</p>
 <h3>Fonts</h3>
 <p>Zen Maru Gothic and Cinzel via Fontsource (SIL Open Font Licence 1.1).</p>
 <h3>Engine</h3>
@@ -46,11 +48,12 @@ export class Title {
       b.glowCrystal(5, 7, { color: 0xb8a0ff, s: 1.1, lightOn: false });
     } };
     await this.world.load(def);
+    await Promise.all(['ren', 'haru', 'airi', 'daigo'].map(loadChar));
     const mk = (key, x, z, hh, ex = {}) => { const a = new Actor({ height: hh, tex: { front: key, ...ex }, tint: this.world.mood.sprite }); a.position.set(x, 0, z); this.world.add(a.group); return a; };
     this.actors = [
       mk('ren', 12.8, 14.4, 1.95), mk('haru', 14.2, 15.6, 1.5), mk('airi', 16.4, 15.4, 1.95), mk('daigo', 17.8, 14.2, 1.9),
     ];
-    this.actors[0].setFlip(-1);
+    this.actors[0].setDir('right'); this.actors[1].setDir('right'); this.actors[3].setDir('left'); this.actors[2].setDir('down');
     this.world.setFocus(new THREE.Vector3(15, -0.3, 13), true);
     this.starMat = new THREE.MeshBasicMaterial({ color: 0xcfe0ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
     this.built = true;

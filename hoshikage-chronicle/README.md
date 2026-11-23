@@ -1,12 +1,12 @@
 # Hoshikage Chronicle  星影
 
-**An HD‑2D anime JRPG that runs in your browser.** Painted anime‑style heroes and villains stand in a lit
+**An HD‑2D anime JRPG that runs in your browser.** Real 3D cel‑shaded anime characters (VRoid models) stand in a lit
 3D world (tilt‑shift, bloom, shadows) — turn‑based battles, a Star‑Burst limit system, a prologue plus five chapters,
 six playable heroes, and an estimated **1–1.5 hours** of play (estimate from content size and the balance simulator —
 it has not been timed with human players yet).
 
 > **Play it:** open **`dist/hoshikage-chronicle.html`** in Chrome / Edge / Firefox / Safari.
-> It is *one self‑contained file* (≈10 MB): code, CSS, fonts and every sprite, 3D prop, texture and sound are embedded.
+> It is *one self‑contained file* (≈30 MB): code, CSS, fonts and every 3D model, texture, song and sound are embedded.
 > No server, no install, no internet needed.
 
 ## Story
@@ -38,16 +38,17 @@ area change, and you can save to 3 slots from the menu. Difficulty / graphics / 
 
 ## Where the art comes from (nothing visual is drawn by code)
 
-Every visible thing is a real file taken from open‑source packages on the npm registry
-(see [`CREDITS.md`](CREDITS.md) for licences):
+Every visible thing is a real file from open sources (see [`CREDITS.md`](CREDITS.md) for licences):
 
-* **Characters** – painted 512 px anime‑style sprite sets from *Sprite Foundry* (`@sprite-foundry/fantasy-heroes-hd`,
-  `fantasy-villains-hd`, `goblin-warband-hd`, `pirate-raiders-hd`, `townsfolk-hd`) – 100+ characters, MIT.
-* **World** – CC0 low‑poly props (trees, rocks, crystals, tents, columns…) and PS1‑style surface textures
-  (Quaternius, Kenney, Screaming Brain Studios) via `@netforge/asset-library-files`. Houses, walls, piers, torii and
-  dungeons are geometry covered with those real texture images.
-* **Audio** – CC0 Kenney sound effects and *Battle Theme A* by cynicmusic. Field/town/dungeon music is generated live by a
-  small Web Audio score engine because no other CC0 music was reachable.
+* **Characters** – real 3D anime models: the *VRoid Studio CC0 models* (VRoid Project / pixiv, CC0) loaded with
+  `@pixiv/three-vrm` and cel‑shaded (MToon, outlines). Every humanoid in the game — heroes, townsfolk, goblins, pirates,
+  villains — is one of these avatars, re‑tinted / rescaled / given props. Monsters (orc brute, frog, demon, ghost…) are
+  rigged CC0 Quaternius GLBs. Dialogue portraits and face icons are rendered live from the same 3D models.
+* **World** – CC0 low‑poly props (trees, rocks, crystals, tents, columns…) re‑lit with toon shading and smoothed normals,
+  and PS1‑style surface textures that are softened into painterly surfaces (Quaternius, Kenney, Screaming Brain Studios).
+  Houses, walls, piers, torii and dungeons are geometry covered with those real texture images.
+* **Audio** – CC0 Kenney sound effects and CC0 music from OpenGameArt (cynicmusic, Bonsaiheldin, messersm, Juhani Junkala,
+  Alexander Ehlers…). The forest, shrine and port themes are generated live by a small Web Audio score engine.
 * **Fonts** – Zen Maru Gothic and Cinzel (OFL).
 
 ## Build & develop
@@ -55,7 +56,8 @@ Every visible thing is a real file taken from open‑source packages on the npm 
 ```bash
 cd hoshikage-chronicle
 npm install                 # three.js + esbuild
-npm run assets              # (optional) re-download packages from npm and rebuild assets/  (needs python3 + Pillow + ffmpeg)
+bash tools/fetch-vrm.sh && bash tools/fetch-music.sh && python3 tools/optimize-vrm.py   # (optional) fetch VRoid models + music from OpenGameArt
+npm run assets              # (optional) re-download npm packages and rebuild assets/  (needs python3 + Pillow + ffmpeg)
 npm run build               # -> dist/hoshikage-chronicle.html  (single file)  +  dist/dev.html (loads ./assets)
 node tools/build.mjs --dev-only --no-min      # fast dev bundle
 python3 -m http.server 8000 # then open http://localhost:8000/dist/dev.html
@@ -71,7 +73,7 @@ python3 -m http.server 8000 # then open http://localhost:8000/dist/dev.html
 
 ```
 src/core      renderer + post FX, asset loader, input, audio, generative music
-src/world     map builder (instanced props, textured geometry, collision), field mode, actors
+src/world     map builder (instanced props, textured geometry, collision), field mode, 3D actors (VRM / GLB)
 src/battle    battle rules (core.js), battle scene, visual effects, stages
 src/ui        dialogue (visual‑novel style), menus, title screen
 src/data      characters, skills, items, enemies, maps & story scripts per chapter

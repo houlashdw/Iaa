@@ -1,14 +1,15 @@
 // Turn-based battle scene: 3D stage + DOM interface. Rules live in core.js.
 import * as THREE from 'three';
 import { World } from '../world/world.js';
-import { Actor } from '../world/actors.js';
+import { Actor3D as Actor } from '../world/actor3d.js';
 import { FX } from './fx.js';
 import { STAGES } from '../data/stages.js';
 import { SKILLS, ELEMENTS, STATUS } from '../data/skills.js';
 import { ITEMS, itemInfo } from '../data/items.js';
 import { CHARS } from '../data/characters.js';
 import { state, statsOf, gainExp, addItem, count, loadSlot, lastSlot } from '../state.js';
-import { loadSprite, faceUrl, spriteUrl } from '../core/assets.js';
+import { loadChar } from '../core/chars.js';
+import { ptImg, ensurePortrait } from '../ui/portraits.js';
 import { input } from '../core/input.js';
 import { audio } from '../core/audio.js';
 import { sleep, tween, easeOut, easeInOut, rand } from '../core/util.js';
@@ -84,17 +85,17 @@ export class Battle {
     w.setFocus(new THREE.Vector3(16.2, 0, 14.0), true);
     w.pitch = 0.4; w.dist = 15.5;
     this.fx = new FX(w);
-    await Promise.all(this.enemies.map((e) => loadSprite(e.sprite + '_fl')));
+    await Promise.all([...this.enemies, ...this.party].map((c) => loadChar(c.sprite)));
+    Promise.all([...this.enemies, ...this.party].map((c) => ensurePortrait(c.sprite, 'face')));
     const slots = ENEMY_SLOTS[Math.min(5, this.enemies.length)];
     this.enemies.forEach((e, i) => {
-      const a = new Actor({ height: e.height, tex: { front: e.sprite + '_fl' }, tint: w.mood.sprite });
-      a.setFlip(-1);
+      const a = new Actor({ height: e.height, tex: { front: e.sprite }, tint: w.mood.sprite, facing: 'right34' });
       e.home = { x: slots[i][0], z: slots[i][1] };
       a.position.set(e.home.x - 8, 0, e.home.z);
       w.add(a.group); e.actor = a;
     });
     this.party.forEach((p, i) => {
-      const a = new Actor({ height: p.height, tex: { front: p.sprite + '_fl' }, tint: w.mood.sprite });
+      const a = new Actor({ height: p.height, tex: { front: p.sprite }, tint: w.mood.sprite, facing: 'left34' });
       p.home = { x: PARTY_SLOTS[i][0], z: PARTY_SLOTS[i][1] };
       a.position.set(p.home.x + 8, 0, p.home.z);
       w.add(a.group); p.actor = a;
@@ -350,10 +351,11 @@ export class Battle {
     let back = null;
     const first = targets[0];
     if (!sk || melee) {
+      c.actor.attack();
       back = await this.lunge(c, first);
     } else {
       // cast pose: little hop + glow
-      c.actor.flash = 0.5;
+      c.actor.flash = 0.5; c.actor.cast();
       this.fx.rise(this.pos(c, 0.2), sk.kind === 'heal' ? 0x9dffc0 : (ELEMENTS[sk.el]?.color ? new THREE.Color(ELEMENTS[sk.el].color).getHex() : 0xffffff), 8, 0.8, 0.07, 0.7);
       await tween(260, (k) => (c.actor.hop = Math.sin(k * Math.PI) * 0.35));
     }
@@ -420,7 +422,7 @@ export class Battle {
     const cls = type === 'poison' ? 'poison' : (t.side === 'party' ? 'hurt' : (r.crit ? 'crit' : r.weak ? 'weak' : 'dmg'));
     this.popup(t, String(dmg), cls + (big ? ' big' : ''), r.crit ? 'CRITICAL!' : r.weak ? 'WEAK!' : r.resist ? 'resist' : '');
     audio.sfx(t.side === 'party' ? 'hurt' : (r.crit || big ? 'impact' : 'hit'), { vol: 0.55, rate: 0.9 + Math.random() * 0.25 });
-    t.actor.flash = 1;
+    t.actor.flash = 1; t.actor.hit();
     if (big) this.world.shake = Math.max(this.world.shake, r.crit ? 0.5 : 0.3);
     const a = t.actor, kx = t.side === 'party' ? 0.45 : -0.45, bx = a.position.x;
     tween(200, (k) => { a.position.x = bx - kx * Math.sin(k * Math.PI) * (type === 'poison' ? 0 : 1); });
@@ -527,7 +529,7 @@ export class Battle {
   async burstCutIn(c, sk) {
     audio.sfx('level_up', { vol: 0.7, rate: 0.9 }); audio.sfx('boss', { vol: 0.6, rate: 1.4 });
     const d = h('div', 'cutin');
-    d.innerHTML = `<div class="cb"></div><img src="${spriteUrl(CHARS[c.id].sprite)}" alt=""><div class="ct1">${esc(sk.name)}</div><div class="ct2">${esc(c.name.toUpperCase())}</div>`;
+    d.innerHTML = `<div class="cb"></div>${ptImg(CHARS[c.id].sprite, 'full')}<div class="ct1">${esc(sk.name)}</div><div class="ct2">${esc(c.name.toUpperCase())}</div>`;
     d.style.setProperty('--c', c.color);
     this.el.appendChild(d);
     this.G.gfx.setFadeColor(0xffffff);
@@ -564,10 +566,10 @@ export class Battle {
   async addEnemy(id) {
     if (this.enemies.length >= 5) return;
     const e = enemyCombatant(id, this.enemies.length + 10);
-    await loadSprite(e.sprite + '_fl');
+    await loadChar(e.sprite);
     const slots = ENEMY_SLOTS[Math.min(5, alive(this.enemies).length + 1)];
     e.home = { x: slots[slots.length - 1][0] - 1, z: slots[slots.length - 1][1] };
-    const a = new Actor({ height: e.height, tex: { front: e.sprite + '_fl' }, tint: this.world.mood.sprite }); a.setFlip(-1);
+    const a = new Actor({ height: e.height, tex: { front: e.sprite }, tint: this.world.mood.sprite, facing: 'right34' });
     a.position.set(e.home.x - 6, 0, e.home.z); this.world.add(a.group); e.actor = a;
     const d = h('div', 'ebar', `<div class="en">${esc(e.name)}</div>${bar('hp', 100)}<div class="est"></div>`); this.q('.bt-ebars').appendChild(d); e.bar = d;
     this.enemies.push(e);
@@ -606,7 +608,7 @@ export class Battle {
     panel.innerHTML = `<div class="rt">VICTORY</div>
       <div class="rsum"><span>EXP <b>+${rw.exp}</b></span><span>Gold <b>+${rw.gold} G</b></span></div>
       ${drops.length ? `<div class="rdrop">Found: ${drops.join(', ')}</div>` : ''}
-      <div class="rmem">${reports.map((r) => `<div class="rm" data-id="${r.id}"><img src="${faceUrl(CHARS[r.id].sprite)}" alt=""><div class="rn">${esc(CHARS[r.id].name)} <small>Lv ${state.roster[r.id].lv}</small>${r.ups.length ? '<span class="lvup">LEVEL UP!</span>' : ''}</div>${bar('xp', 100)}</div>`).join('')}</div>
+      <div class="rmem">${reports.map((r) => `<div class="rm" data-id="${r.id}">${ptImg(CHARS[r.id].sprite, 'face')}<div class="rn">${esc(CHARS[r.id].name)} <small>Lv ${state.roster[r.id].lv}</small>${r.ups.length ? '<span class="lvup">LEVEL UP!</span>' : ''}</div>${bar('xp', 100)}</div>`).join('')}</div>
       <div class="rhint">▼</div>`;
     this.el.appendChild(panel);
     await sleep(350);
@@ -618,7 +620,7 @@ export class Battle {
         const c = CHARS[r.id];
         const keys = [['maxHp', 'HP'], ['maxMp', 'MP'], ['atk', 'ATK'], ['def', 'DEF'], ['mag', 'MAG'], ['res', 'RES'], ['spd', 'SPD']];
         const lp = h('div', 'results panel lvl');
-        lp.innerHTML = `<div class="lvh"><img src="${spriteUrl(c.sprite)}" alt=""><div><div class="rt">${esc(c.name)}</div><div class="lvn">Level ${up.lv - 1} → <b>${up.lv}</b></div></div></div>
+        lp.innerHTML = `<div class="lvh">${ptImg(c.sprite, 'full')}<div><div class="rt">${esc(c.name)}</div><div class="lvn">Level ${up.lv - 1} → <b>${up.lv}</b></div></div></div>
           <div class="stats">${keys.map(([k, n]) => `<div><span>${n}</span><span>${up.before[k]} → <b>${up.after[k]}</b></span></div>`).join('')}</div>
           ${up.skills.length ? `<div class="newsk">Learned: ${up.skills.map((s) => esc(SKILLS[s].name)).join(', ')}</div>` : ''}<div class="rhint">▼</div>`;
         this.el.appendChild(lp);
@@ -683,7 +685,7 @@ export class Battle {
       const st = Object.keys(p.status).filter((k) => STATUS[k]).map((k) => `<span style="color:${STATUS[k].color}" title="${STATUS[k].name}">${STATUS[k].icon}</span>`).join('');
       const pct = (p.hp / p.maxHp) * 100;
       return `<div class="pm${this.cur === p ? ' cur' : ''}${p.alive ? '' : ' ko'}" style="--c:${p.color}">
-        <img src="${faceUrl(CHARS[p.id].sprite)}" alt="">
+        ${ptImg(CHARS[p.id].sprite, 'face')}
         <div class="pi"><div class="pn">${esc(p.name)} <span class="st">${st}</span></div>
           ${bar('hp' + (pct < 30 ? ' low' : ''), pct)}<div class="num"><b>${Math.max(0, p.hp)}</b>/${p.maxHp}</div>
           ${bar('mp', (p.mp / p.maxMp) * 100)}<div class="num mpn">${p.mp} MP</div></div></div>`;
@@ -694,7 +696,7 @@ export class Battle {
     const box = this.q('.bt-turns');
     const next = turnOrder([...this.party, ...this.enemies].filter((c) => c.alive)).slice(0, 4);
     const list = [...order.filter((c) => c.alive).slice(0, 7), ...next].slice(0, 8);
-    box.innerHTML = list.map((c, i) => `<div class="tc ${c.side}${i === 0 ? ' now' : ''}"><img src="${faceUrl(c.sprite)}" alt=""></div>`).join('');
+    box.innerHTML = list.map((c, i) => `<div class="tc ${c.side}${i === 0 ? ' now' : ''}">${ptImg(c.sprite, 'face')}</div>`).join('');
   }
   positionOverlays() {
     const G = this.G;

@@ -267,8 +267,7 @@ export function registerCastle(MAPS) {
           'haru: We\'re going to put the Moon back!',
           'sovereign: And I am going to eat it. Come then, small hero. Be brave one more time.',
         ]);
-        G.music('battle_theme_a');
-        const r2 = await G.bossBattle(['boss_tyrant'], { stage: 'throne', music: 'battle_theme_a', events: [
+        const r2 = await G.bossBattle(['boss_tyrant'], { stage: 'throne', music: 'final_boss', events: [
           { when: 'hp', enemy: 0, below: 0.66, async run(G, B) {
             B.world.shake = 0.7;
             await G.say(['sovereign: Your Shards hum so loudly. Do they want to go home? Or to me?', 'haru: ...Hang on, everybody. I can feel them. They\'re — they\'re answering ME.']);

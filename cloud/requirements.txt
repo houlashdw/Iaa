@@ -1,0 +1,10 @@
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27
+pydantic>=2
+huggingface_hub
+diffusers==0.35.1
+transformers
+accelerate
+safetensors
+sentencepiece

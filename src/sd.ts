@@ -41,6 +41,7 @@ export type DrawOptions = {
   cfg: number;
   threads: number;
   outUri: string;
+  seed: number;
   sampler: string;
   scheduler: string;
   filter: string;
@@ -64,7 +65,7 @@ export async function drawImage(o: DrawOptions): Promise<string> {
       height: o.size,
       steps: o.steps,
       cfg: o.cfg,
-      seed: -1,
+      seed: o.seed,
       threads: o.threads,
       out: strip(o.outUri),
       sampler: o.sampler,

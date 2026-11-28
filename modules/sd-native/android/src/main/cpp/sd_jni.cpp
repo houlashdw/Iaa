@@ -141,7 +141,13 @@ JNIEXPORT jstring JNICALL Java_expo_modules_sdnative_SdBridge_nativeGenerate(
     enum scheduler_t sc = str_to_scheduler(scheduler.c_str());
     if (sc != SCHEDULER_COUNT) gp.sample_params.scheduler = sc;
   }
-  gp.vae_tiling_params.enabled = true;  // экономит память при декодировании
+  // Тайлинг VAE даёт швы на 512px, поэтому включаем его только для больших картинок.
+  if (width > 576 || height > 576) {
+    gp.vae_tiling_params.enabled = true;
+    gp.vae_tiling_params.tile_size_w = 384;
+    gp.vae_tiling_params.tile_size_h = 384;
+    gp.vae_tiling_params.target_overlap = 0.5f;
+  }
 
   sd_image_generation_result_t* result = nullptr;
   bool ok = generate_image(g_ctx, &gp, &result);

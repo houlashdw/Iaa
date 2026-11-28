@@ -17,7 +17,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as FS from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
-import { DRAW_STYLES, PROMPT_ENHANCER_SYSTEM, Settings } from './config';
+import { DRAW_STYLES, ENHANCER_MAX_CHARS, PROMPT_ENHANCER_SYSTEM, Settings } from './config';
 import {
   ChatMsg,
   ensureLoaded,
@@ -259,13 +259,21 @@ export default function ChatScreen(p: Props) {
           {
             ...p.settings,
             systemPrompt: PROMPT_ENHANCER_SYSTEM,
-            maxNewTokens: 160,
-            temperature: 0.8,
+            maxNewTokens: 100,
+            temperature: 0.9,
           },
           () => {},
+          0.95,
         );
-        const cleaned = r.text.replace(/^["'\s]+|["'\s]+$/g, '');
-        if (cleaned) prompt = cleaned;
+        const cleaned = r.text
+          .replace(/<think>[\s\S]*?<\/think>/g, '')
+          .replace(/^\s*prompt\s*:\s*/i, '')
+          .replace(/^["'\s]+|["'\s]+$/g, '')
+          .replace(/\s*\n+\s*/g, ' ');
+        const same = cleaned.toLowerCase() === request.trim().toLowerCase();
+        if (cleaned.length >= 8 && cleaned.length <= ENHANCER_MAX_CHARS && !same && !/^⚠/.test(cleaned)) {
+          prompt = cleaned;
+        }
       }
       const style = DRAW_STYLES.find((x) => x.id === p.settings.sdStyle) ?? DRAW_STYLES[0];
       return style.suffix ? `${prompt}, ${style.suffix}` : prompt;
@@ -277,10 +285,14 @@ export default function ChatScreen(p: Props) {
     if (generating || phase !== 'ready' || !p.sdUri) return;
     const asst: ChatMsg = { id: uid(), role: 'assistant', text: '', images: [] };
     setMessages((cur) => [...cur, asst]);
-    await renderImage(asst.id, async () => finalPrompt);
+    await renderImage(asst.id, async () => finalPrompt, true);
   };
 
-  const renderImage = async (asstId: string, getPrompt: () => Promise<string>) => {
+  const renderImage = async (
+    asstId: string,
+    getPrompt: () => Promise<string>,
+    fromRedraw = false,
+  ) => {
     setGenerating(true);
     setDrawing(true);
     setSlow(null);
@@ -296,7 +308,13 @@ export default function ChatScreen(p: Props) {
       setStatus('Загружаю художника…');
       await ensureGallery();
       const out = `${GALLERY_DIR}gen-${Date.now()}.png`;
+      const fixed = parseInt((p.settings.sdSeed ?? '').trim(), 10);
+      const seed =
+        !fromRedraw && isFinite(fixed) && fixed >= 0
+          ? fixed
+          : Math.floor(Math.random() * 2147483647);
       await drawImage({
+        seed,
         modelUri: p.sdUri as string,
         prompt: finalPrompt,
         negative,
@@ -310,7 +328,13 @@ export default function ChatScreen(p: Props) {
         filter: style.filter ?? '',
         onProgress: (step, steps) => setStatus(`Рисую: шаг ${step} из ${steps}…`),
       });
-      patch((m) => ({ ...m, text: `🎨 ${finalPrompt}`, images: [out], generated: true }));
+      patch((m) => ({
+        ...m,
+        text: `🎨 ${finalPrompt}`,
+        images: [out],
+        generated: true,
+        stats: `seed ${seed}`,
+      }));
     } catch (e: any) {
       patch((m) => ({ ...m, text: `⚠️ ${String(e?.message ?? e)}` }));
     } finally {

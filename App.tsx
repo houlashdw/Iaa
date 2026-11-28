@@ -29,7 +29,7 @@ function Root() {
       setModelFile(st.modelFile);
       setMmprojFile(st.mmprojFile);
       setSdFile(st.sdFile);
-      setSettings(st.settings);
+      setSettings({ ...DEFAULT_SETTINGS, ...st.settings });
       await refresh();
       setLoaded(true);
       setScreen('setup');

@@ -29,6 +29,7 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
   const [sdNeg, setSdNeg] = useState(settings.sdNegative);
   const [sdSampler, setSdSampler] = useState(settings.sdSampler);
   const [sdSched, setSdSched] = useState(settings.sdScheduler);
+  const [sdSeed, setSdSeed] = useState(settings.sdSeed ?? '');
 
   const field = (
     label: string,
@@ -65,6 +66,7 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
       sdSampler: sdSampler.trim() || 'auto',
       sdScheduler: sdSched.trim() || 'auto',
       sdStyle: settings.sdStyle,
+      sdSeed: /^\d+$/.test(sdSeed.trim()) ? sdSeed.trim() : '',
     });
   };
 
@@ -124,9 +126,16 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
         </View>
         {field('Сэмплер', 'auto, lcm, euler_a, euler, dpm++2m. Для LCM-модели ставь lcm', sdSampler, setSdSampler, true)}
         {field('Планировщик', 'auto или lcm, karras, discrete…', sdSched, setSdSched, true)}
-        {field('Размер картинки (px)', '256–1024, кратно 64. 512 = быстро, 768+ = очень долго', sdSize, setSdSize)}
+        {field('Размер картинки (px)', 'Качество: рекомендуется 512 (384–640). Кратно 64; больше = дольше и хуже композиция', sdSize, setSdSize)}
+        {Number(sdSize.replace(',', '.')) > 640 ? (
+          <Text style={{ color: C.accent, marginTop: 6 }}>
+            Внимание: SD 1.5 обучена на 512px. На больших размерах композиция ломается
+            (двойные объекты, повторы). Лучше 512, максимум 576–640.
+          </Text>
+        ) : null}
         {field('Шаги', 'Для SD-Turbo 1–4. Больше шагов = дольше', sdSteps, setSdSteps)}
         {field('CFG (следование описанию)', 'Для SD-Turbo 1.0. Для обычных SD 1.5 — 6–8', sdCfg, setSdCfg)}
+        {field('Seed (пусто = случайный)', 'Число для повторяемости. «Ещё вариант» всегда берёт новый случайный', sdSeed, setSdSeed)}
         <Text style={[S.text, { marginTop: 12 }]}>Негативный промпт</Text>
         <TextInput
           style={[S.input, { marginTop: 4, minHeight: 60, textAlignVertical: 'top' }]}

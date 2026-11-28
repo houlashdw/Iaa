@@ -92,6 +92,7 @@ export async function generate(
   history: ChatMsg[],
   s: Settings,
   onToken: (accumulated: string, count: number) => void,
+  topP = 0.9,
 ): Promise<{ text: string; stats: string }> {
   if (!ctx) throw new Error('Модель не загружена');
   let acc = '';
@@ -101,7 +102,7 @@ export async function generate(
       messages: buildMessages(history, s.systemPrompt),
       n_predict: s.maxNewTokens,
       temperature: s.temperature,
-      top_p: 0.9,
+      top_p: topP,
       stop: ['<|im_end|>', '<|endoftext|>'],
     },
     (data) => {

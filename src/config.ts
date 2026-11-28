@@ -157,6 +157,16 @@ export const PROMPT_ENHANCER_SYSTEM =
 /** Допустимая длина ответа улучшателя (иначе берём исходный запрос). */
 export const ENHANCER_MAX_CHARS = 420;
 
+/** Прежнее значение imageMaxTokens по умолчанию (для миграции настроек). */
+export const OLD_DEFAULT_IMAGE_TOKENS = 512;
+
+/** Запрос уже похож на готовый английский промпт: улучшатель не нужен. */
+export function looksLikeEnglishPrompt(s: string): boolean {
+  if (/[\u0400-\u04FF]/.test(s)) return false;
+  const words = s.split(/\s+/).filter((w) => /[A-Za-z]/.test(w));
+  return words.length >= 12;
+}
+
 export const DEFAULT_SYSTEM_PROMPT =
   'Ты полезный ассистент. Отвечай на языке пользователя. Если есть изображение, внимательно его опиши и ответь на вопрос.';
 
@@ -165,6 +175,10 @@ export type Settings = {
   nCtx: number;
   nThreads: number;
   imageMaxTokens: number;
+  nUbatch: number; // физический батч обработки промпта
+  flashAttn: boolean; // flash attention ('auto' в llama.cpp)
+  lazyVision: boolean; // грузить mmproj только при первой картинке
+  keepLlmDrawing: 'auto' | 'on' | 'off'; // держать LLM в памяти при рисовании
   temperature: number;
   maxNewTokens: number;
   sdSteps: number;
@@ -181,7 +195,11 @@ export const DEFAULT_SETTINGS: Settings = {
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   nCtx: 4096,
   nThreads: 4,
-  imageMaxTokens: 512,
+  imageMaxTokens: 384,
+  nUbatch: 512,
+  flashAttn: true,
+  lazyVision: true,
+  keepLlmDrawing: 'auto',
   temperature: 0.7,
   maxNewTokens: 1024,
   sdSteps: 4,

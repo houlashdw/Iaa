@@ -17,11 +17,18 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as FS from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
-import { DRAW_STYLES, ENHANCER_MAX_CHARS, PROMPT_ENHANCER_SYSTEM, Settings } from './config';
+import {
+  DRAW_STYLES,
+  ENHANCER_MAX_CHARS,
+  PROMPT_ENHANCER_SYSTEM,
+  Settings,
+  looksLikeEnglishPrompt,
+} from './config';
 import {
   ChatMsg,
   ensureLoaded,
   generate,
+  isLoaded,
   loadModel,
   stopGeneration,
   unloadModel,
@@ -40,7 +47,14 @@ type Props = {
   onBack: () => void;
 };
 
-const MAX_SIDE = 1024;
+/**
+ * Сторона картинки в JS: токены Qwen3-VL = пиксели / 32², поэтому больше sqrt(токены)*32
+ * нет смысла отправлять: нативный код всё равно уменьшит. Округляем до 64, предел 448..1024.
+ */
+function maxSideFor(imageMaxTokens: number): number {
+  const side = Math.round((Math.sqrt(imageMaxTokens) * 32) / 64) * 64;
+  return Math.min(1024, Math.max(448, side));
+}
 const MAX_IMAGES = 4;
 let counter = 0;
 const uid = () => `${Date.now()}-${counter++}`;
@@ -84,11 +98,14 @@ async function saveHistory(msgs: ChatMsg[]): Promise<void> {
   }
 }
 
-async function prepareImage(asset: ImagePicker.ImagePickerAsset): Promise<string> {
+async function prepareImage(
+  asset: ImagePicker.ImagePickerAsset,
+  maxSide: number,
+): Promise<string> {
   const { width, height } = asset;
-  const big = Math.max(width, height) > MAX_SIDE;
+  const big = Math.max(width, height) > maxSide;
   const actions = big
-    ? [{ resize: width >= height ? { width: MAX_SIDE } : { height: MAX_SIDE } }]
+    ? [{ resize: width >= height ? { width: maxSide } : { height: maxSide } }]
     : [];
   const r = await manipulateAsync(asset.uri, actions, {
     compress: 0.85,
@@ -153,7 +170,7 @@ export default function ChatScreen(p: Props) {
     try {
       const room = MAX_IMAGES - pending.length;
       const uris: string[] = [];
-      for (const a of assets.slice(0, Math.max(room, 0))) uris.push(await prepareImage(a));
+      for (const a of assets.slice(0, Math.max(room, 0))) uris.push(await prepareImage(a, maxSideFor(p.settings.imageMaxTokens)));
       setPending((cur) => [...cur, ...uris]);
     } catch (e: any) {
       Alert.alert('Не удалось обработать картинку', String(e?.message ?? e));
@@ -205,13 +222,19 @@ export default function ChatScreen(p: Props) {
     setPending([]);
     setGenerating(true);
     setSlow(null);
-    setStatus('Думаю… (с картинкой первый ответ может идти до минуты)');
+    const hasImg = history.some((m) => m.images.length > 0);
+    const readingStatus = hasImg
+      ? 'Читаю промпт и разбираю картинку… (первый раз может занять до минуты)'
+      : 'Читаю промпт…';
+    setStatus(readingStatus);
     await activateKeepAwakeAsync('gen');
     const patch = patchFor(asst.id);
     try {
-      setStatus('Загружаю модель…');
-      await ensureLoaded();
-      setStatus('Думаю… (с картинкой первый ответ может идти до минуты)');
+      if (!isLoaded()) {
+        setStatus('Загружаю модель…');
+        await ensureLoaded();
+      }
+      setStatus(readingStatus);
       let tFirst = 0;
       const r = await generate(history, p.settings, (acc, count) => {
         const now = Date.now();
@@ -230,7 +253,7 @@ export default function ChatScreen(p: Props) {
           }
         }
         patch((m) => ({ ...m, text: acc, stats }));
-      });
+      }, 0.9, setStatus);
       patch((m) => ({ ...m, text: r.text || m.text, stats: r.stats }));
     } catch (e: any) {
       const msg = String(e?.message ?? e);
@@ -244,16 +267,32 @@ export default function ChatScreen(p: Props) {
     }
   };
 
+  const phasePlan = useRef({ i: 0, n: 2 });
+  const phaseStatus = (text: string) => {
+    phasePlan.current.i = Math.min(phasePlan.current.i + 1, phasePlan.current.n);
+    setStatus(`[${phasePlan.current.i}/${phasePlan.current.n}] ${text}`);
+  };
+  // Держать ли LLM в памяти во время рисования (авто: только для маленьких моделей 1-4B).
+  const keepLlm =
+    p.settings.keepLlmDrawing === 'on' ||
+    (p.settings.keepLlmDrawing === 'auto' && /(^|[^0-9])[1-4]b/i.test(p.modelName));
+
   const draw = async (request: string) => {
     const userMsg: ChatMsg = { id: uid(), role: 'user', text: request, images: [] };
     const asst: ChatMsg = { id: uid(), role: 'assistant', text: '', images: [] };
     setMessages((cur) => [...cur, userMsg, asst]);
     setInput('');
+    const needEnhance = enhance && !looksLikeEnglishPrompt(request);
+    // этапы: [улучшатель] -> загрузка художника -> рисование
+    phasePlan.current = { i: 0, n: (needEnhance ? 1 : 0) + 2 };
     await renderImage(asst.id, async () => {
       let prompt = request;
-      if (enhance) {
-        setStatus('Модель пишет промпт для художника…');
-        await ensureLoaded();
+      if (needEnhance) {
+        if (!isLoaded()) {
+          setStatus('Загружаю языковую модель для промпта…');
+          await ensureLoaded();
+        }
+        phaseStatus('Модель пишет промпт для художника…');
         const r = await generate(
           [{ id: 'enh', role: 'user', text: request, images: [] }],
           {
@@ -264,6 +303,7 @@ export default function ChatScreen(p: Props) {
           },
           () => {},
           0.95,
+          setStatus,
         );
         const cleaned = r.text
           .replace(/<think>[\s\S]*?<\/think>/g, '')
@@ -283,6 +323,7 @@ export default function ChatScreen(p: Props) {
   /** Ещё один вариант с тем же финальным промптом (новый seed), без повторного вызова LLM. */
   const redraw = async (finalPrompt: string) => {
     if (generating || phase !== 'ready' || !p.sdUri) return;
+    phasePlan.current = { i: 0, n: 2 };
     const asst: ChatMsg = { id: uid(), role: 'assistant', text: '', images: [] };
     setMessages((cur) => [...cur, asst]);
     await renderImage(asst.id, async () => finalPrompt, true);
@@ -303,9 +344,12 @@ export default function ChatScreen(p: Props) {
       const style = DRAW_STYLES.find((x) => x.id === p.settings.sdStyle) ?? DRAW_STYLES[0];
       const negative = [p.settings.sdNegative, style.negative].filter(Boolean).join(', ');
       patch((m) => ({ ...m, text: `🎨 ${finalPrompt}`, drawPrompt: finalPrompt }));
-      setStatus('Освобождаю память…');
-      await unloadModel();
-      setStatus('Загружаю художника…');
+      if (keepLlm) {
+        phaseStatus('Загружаю художника (языковая модель остаётся в памяти)…');
+      } else {
+        phaseStatus('Выгружаю языковую модель и загружаю художника…');
+        await unloadModel();
+      }
       await ensureGallery();
       const out = `${GALLERY_DIR}gen-${Date.now()}.png`;
       const fixed = parseInt((p.settings.sdSeed ?? '').trim(), 10);
@@ -326,7 +370,11 @@ export default function ChatScreen(p: Props) {
         sampler: p.settings.sdSampler,
         scheduler: p.settings.sdScheduler,
         filter: style.filter ?? '',
-        onProgress: (step, steps) => setStatus(`Рисую: шаг ${step} из ${steps}…`),
+        onProgress: (step, steps) => {
+          const n = phasePlan.current.n;
+          phasePlan.current.i = n;
+          setStatus(`[${n}/${n}] Рисую: шаг ${step} из ${steps}…`);
+        },
       });
       patch((m) => ({
         ...m,
@@ -536,7 +584,7 @@ export default function ChatScreen(p: Props) {
               <Text style={S.dim}>
                 🎨 Режим рисования ({p.settings.sdSize}px, {p.settings.sdSteps} шагов). Модель
                 пишет промпт за тебя: {enhance ? 'ВКЛ' : 'ВЫКЛ'} (нажми, чтобы переключить).
-                Если выключено, пиши описание по-английски.
+                Готовый английский промпт (от 12 слов) пропускает этот шаг. Если выключено, пиши по-английски.
               </Text>
             </Pressable>
           ) : null}
@@ -645,6 +693,9 @@ export default function ChatScreen(p: Props) {
           const reload =
             ns.nCtx !== p.settings.nCtx ||
             ns.nThreads !== p.settings.nThreads ||
+            ns.nUbatch !== p.settings.nUbatch ||
+            ns.flashAttn !== p.settings.flashAttn ||
+            ns.lazyVision !== p.settings.lazyVision ||
             ns.imageMaxTokens !== p.settings.imageMaxTokens;
           p.onSettingsChange(ns);
           setShowSettings(false);

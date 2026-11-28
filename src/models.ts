@@ -1,5 +1,5 @@
 import * as FS from 'expo-file-system/legacy';
-import { DEFAULT_SETTINGS, Settings } from './config';
+import { DEFAULT_SETTINGS, OLD_DEFAULT_IMAGE_TOKENS, Settings } from './config';
 
 export const MODELS_DIR = `${FS.documentDirectory}models/`;
 const STATE_FILE = `${FS.documentDirectory}state.json`;
@@ -13,7 +13,7 @@ export type SavedState = {
   settings: Settings;
 };
 
-const STATE_VERSION = 2;
+const STATE_VERSION = 3;
 
 export function fileNameFromUrl(url: string): string {
   const clean = url.split('?')[0].split('#')[0];
@@ -180,9 +180,17 @@ export async function loadState(): Promise<SavedState> {
     const raw = await FS.readAsStringAsync(STATE_FILE);
     const j = JSON.parse(raw) as Partial<SavedState> & { version?: number };
     // Старые сохранённые настройки (версия < 2) сбрасываем: поменялись потоки по умолчанию.
+    // Версия 2 -> 3: новые поля получают значения по умолчанию, пользовательские значения
+    // сохраняются; прежний дефолт картинки (512) заменяется на новый (меньше = быстрее).
     const settings =
-      j.version === STATE_VERSION
-        ? { ...DEFAULT_SETTINGS, ...(j.settings ?? {}) }
+      j.version === STATE_VERSION || j.version === 2
+        ? {
+            ...DEFAULT_SETTINGS,
+            ...(j.settings ?? {}),
+            ...(j.version === 2 && j.settings?.imageMaxTokens === OLD_DEFAULT_IMAGE_TOKENS
+              ? { imageMaxTokens: DEFAULT_SETTINGS.imageMaxTokens }
+              : {}),
+          }
         : { ...DEFAULT_SETTINGS, systemPrompt: j.settings?.systemPrompt ?? DEFAULT_SETTINGS.systemPrompt };
     return {
       modelFile: j.modelFile ?? null,

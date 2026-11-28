@@ -16,11 +16,30 @@ function num(v: string, fallback: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
+function Toggle(p: { label: string; hint: string; on: boolean; set: (v: boolean) => void }) {
+  return (
+    <View style={{ marginTop: 12 }}>
+      <Text style={S.text}>{p.label}</Text>
+      <Text style={S.dim}>{p.hint}</Text>
+      <Pressable
+        style={[S.btn2, { marginTop: 4, alignSelf: 'flex-start' }, p.on ? { borderColor: C.accent } : null]}
+        onPress={() => p.set(!p.on)}
+      >
+        <Text style={[S.btn2Text, p.on ? { color: C.accent } : null]}>{p.on ? 'Включено' : 'Выключено'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function SettingsModal({ visible, settings, onClose, onSave }: Props) {
   const [sys, setSys] = useState(settings.systemPrompt);
   const [ctx, setCtx] = useState(String(settings.nCtx));
   const [thr, setThr] = useState(String(settings.nThreads));
   const [img, setImg] = useState(String(settings.imageMaxTokens));
+  const [ubatch, setUbatch] = useState(String(settings.nUbatch));
+  const [flash, setFlash] = useState(settings.flashAttn);
+  const [lazy, setLazy] = useState(settings.lazyVision);
+  const [keepLlm, setKeepLlm] = useState<Settings['keepLlmDrawing']>(settings.keepLlmDrawing);
   const [temp, setTemp] = useState(String(settings.temperature));
   const [maxNew, setMaxNew] = useState(String(settings.maxNewTokens));
   const [sdSteps, setSdSteps] = useState(String(settings.sdSteps));
@@ -57,6 +76,10 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
       nCtx: Math.round(num(ctx, DEFAULT_SETTINGS.nCtx, 1024, 16384)),
       nThreads: Math.round(num(thr, DEFAULT_SETTINGS.nThreads, 1, 8)),
       imageMaxTokens: Math.round(num(img, DEFAULT_SETTINGS.imageMaxTokens, 64, 2048)),
+      nUbatch: Math.round(num(ubatch, DEFAULT_SETTINGS.nUbatch, 64, 2048) / 64) * 64,
+      flashAttn: flash,
+      lazyVision: lazy,
+      keepLlmDrawing: keepLlm,
       temperature: num(temp, DEFAULT_SETTINGS.temperature, 0, 2),
       maxNewTokens: Math.round(num(maxNew, DEFAULT_SETTINGS.maxNewTokens, 16, 8192)),
       sdSteps: Math.round(num(sdSteps, DEFAULT_SETTINGS.sdSteps, 1, 50)),
@@ -95,17 +118,53 @@ export default function SettingsModal({ visible, settings, onClose, onSave }: Pr
         )}
         {field(
           'Потоки процессора',
-          'Для Dimensity 9400 лучше 4–6. Перезагрузка модели',
+          'Для Dimensity 9400 оптимально 4 (X925 + 3×X4); больше 4 подключает медленные ядра A720. Перезагрузка модели',
           thr,
           setThr,
         )}
         {field(
           'Макс. токенов на картинку',
-          'Меньше = быстрее, но грубее детали (256–1024). Перезагрузка модели',
+          'Меньше = быстрее читает картинку, но грубее детали. 256–384 быстро, 512+ медленно (64–2048). Перезагрузка модели',
           img,
           setImg,
         )}
+        {field(
+          'Батч обработки промпта (n_ubatch)',
+          'Токенов за один проход при чтении промпта. 512 — стандарт; 256–1024 можно пробовать. Перезагрузка модели',
+          ubatch,
+          setUbatch,
+        )}
+        <Toggle
+          label="Flash attention"
+          hint="Обычно ускоряет чтение длинного промпта и экономит память. Если ответы стали медленнее, выключи. Перезагрузка модели"
+          on={flash}
+          set={setFlash}
+        />
+        <Toggle
+          label="Грузить зрение только при первой картинке"
+          hint="Текстовый чат стартует быстрее и занимает меньше памяти. Перезагрузка модели"
+          on={lazy}
+          set={setLazy}
+        />
         <Text style={[S.h2, { marginTop: 24 }]}>Рисование</Text>
+        <Text style={[S.text, { marginTop: 12 }]}>Держать модель в памяти при рисовании</Text>
+        <Text style={S.dim}>
+          Быстрее: не нужно выгружать и заново читать модель. Авто = только для 1–4B; 8B лучше
+          выгружать, иначе не хватит памяти.
+        </Text>
+        <View style={{ flexDirection: 'row', marginTop: 6 }}>
+          {(['auto', 'on', 'off'] as const).map((k) => (
+            <Pressable
+              key={k}
+              style={[S.btn2, { marginRight: 8 }, keepLlm === k ? { borderColor: C.accent } : null]}
+              onPress={() => setKeepLlm(k)}
+            >
+              <Text style={[S.btn2Text, keepLlm === k ? { color: C.accent } : null]}>
+                {k === 'auto' ? 'Авто' : k === 'on' ? 'Да' : 'Нет'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
         <Text style={S.dim}>Быстрая настройка под модель-художник:</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
           {SD_PRESETS.map((pr) => (

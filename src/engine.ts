@@ -8,6 +8,7 @@ export type ChatMsg = {
   images: string[];
   stats?: string;
   generated?: boolean;
+  drawPrompt?: string;
 };
 
 let ctx: LlamaContext | null = null;

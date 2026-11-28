@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as FS from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { DRAW_STYLES, PROMPT_ENHANCER_SYSTEM, Settings } from './config';
 import {
@@ -44,6 +45,45 @@ const MAX_IMAGES = 4;
 let counter = 0;
 const uid = () => `${Date.now()}-${counter++}`;
 
+const GALLERY_DIR = `${FS.documentDirectory}gallery/`;
+const HISTORY_FILE = `${FS.documentDirectory}chat-history.json`;
+
+async function ensureGallery(): Promise<void> {
+  const info = await FS.getInfoAsync(GALLERY_DIR);
+  if (!info.exists) await FS.makeDirectoryAsync(GALLERY_DIR, { intermediates: true });
+}
+
+/** Копирует файл из кэша в постоянную галерею приложения. */
+async function persistImage(uri: string): Promise<string> {
+  if (uri.startsWith(GALLERY_DIR)) return uri;
+  await ensureGallery();
+  const dest = `${GALLERY_DIR}img-${Date.now()}-${counter++}.jpg`;
+  await FS.copyAsync({ from: uri, to: dest });
+  return dest;
+}
+
+async function loadHistory(): Promise<ChatMsg[]> {
+  try {
+    const info = await FS.getInfoAsync(HISTORY_FILE);
+    if (!info.exists) return [];
+    const arr = JSON.parse(await FS.readAsStringAsync(HISTORY_FILE));
+    if (!Array.isArray(arr)) return [];
+    return (arr as ChatMsg[]).filter(
+      (m) => m && m.id && (m.role === 'user' || m.text || (m.images && m.images.length > 0)),
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function saveHistory(msgs: ChatMsg[]): Promise<void> {
+  try {
+    await FS.writeAsStringAsync(HISTORY_FILE, JSON.stringify(msgs));
+  } catch {
+    // игнорируем
+  }
+}
+
 async function prepareImage(asset: ImagePicker.ImagePickerAsset): Promise<string> {
   const { width, height } = asset;
   const big = Math.max(width, height) > MAX_SIDE;
@@ -72,6 +112,20 @@ export default function ChatScreen(p: Props) {
   const [status, setStatus] = useState('Думаю… (с картинкой первый ответ может идти до минуты)');
   const [slow, setSlow] = useState<string | null>(null);
   const listRef = useRef<FlatList<ChatMsg>>(null);
+  const historyLoaded = useRef(false);
+
+  useEffect(() => {
+    loadHistory().then((h) => {
+      historyLoaded.current = true;
+      if (h.length > 0) setMessages((cur) => (cur.length === 0 ? h : cur));
+    });
+  }, []);
+
+  // сохраняем историю после каждого завершённого ответа
+  useEffect(() => {
+    if (!historyLoaded.current || generating) return;
+    saveHistory(messages);
+  }, [messages, generating]);
 
   const load = useCallback(
     async (s: Settings) => {
@@ -137,7 +191,13 @@ export default function ChatScreen(p: Props) {
       return;
     }
     if (!text && pending.length === 0) return;
-    const userMsg: ChatMsg = { id: uid(), role: 'user', text, images: pending };
+    let kept = pending;
+    try {
+      kept = await Promise.all(pending.map(persistImage));
+    } catch {
+      // оставляем исходные пути
+    }
+    const userMsg: ChatMsg = { id: uid(), role: 'user', text, images: kept };
     const asst: ChatMsg = { id: uid(), role: 'assistant', text: '', images: [] };
     const history = [...messages, userMsg];
     setMessages([...history, asst]);
@@ -189,12 +249,7 @@ export default function ChatScreen(p: Props) {
     const asst: ChatMsg = { id: uid(), role: 'assistant', text: '', images: [] };
     setMessages((cur) => [...cur, userMsg, asst]);
     setInput('');
-    setGenerating(true);
-    setDrawing(true);
-    setSlow(null);
-    await activateKeepAwakeAsync('gen');
-    const patch = patchFor(asst.id);
-    try {
+    await renderImage(asst.id, async () => {
       let prompt = request;
       if (enhance) {
         setStatus('Модель пишет промпт для художника…');
@@ -213,13 +268,34 @@ export default function ChatScreen(p: Props) {
         if (cleaned) prompt = cleaned;
       }
       const style = DRAW_STYLES.find((x) => x.id === p.settings.sdStyle) ?? DRAW_STYLES[0];
-      const finalPrompt = style.suffix ? `${prompt}, ${style.suffix}` : prompt;
+      return style.suffix ? `${prompt}, ${style.suffix}` : prompt;
+    });
+  };
+
+  /** Ещё один вариант с тем же финальным промптом (новый seed), без повторного вызова LLM. */
+  const redraw = async (finalPrompt: string) => {
+    if (generating || phase !== 'ready' || !p.sdUri) return;
+    const asst: ChatMsg = { id: uid(), role: 'assistant', text: '', images: [] };
+    setMessages((cur) => [...cur, asst]);
+    await renderImage(asst.id, async () => finalPrompt);
+  };
+
+  const renderImage = async (asstId: string, getPrompt: () => Promise<string>) => {
+    setGenerating(true);
+    setDrawing(true);
+    setSlow(null);
+    await activateKeepAwakeAsync('gen');
+    const patch = patchFor(asstId);
+    try {
+      const finalPrompt = await getPrompt();
+      const style = DRAW_STYLES.find((x) => x.id === p.settings.sdStyle) ?? DRAW_STYLES[0];
       const negative = [p.settings.sdNegative, style.negative].filter(Boolean).join(', ');
-      patch((m) => ({ ...m, text: `🎨 ${finalPrompt}` }));
+      patch((m) => ({ ...m, text: `🎨 ${finalPrompt}`, drawPrompt: finalPrompt }));
       setStatus('Освобождаю память…');
       await unloadModel();
       setStatus('Загружаю художника…');
-      const out = `${FS.cacheDirectory}gen-${Date.now()}.png`;
+      await ensureGallery();
+      const out = `${GALLERY_DIR}gen-${Date.now()}.png`;
       await drawImage({
         modelUri: p.sdUri as string,
         prompt: finalPrompt,
@@ -242,6 +318,20 @@ export default function ChatScreen(p: Props) {
       setDrawing(false);
       setGenerating(false);
       deactivateKeepAwake('gen');
+    }
+  };
+
+  const saveToGallery = async (uri: string) => {
+    try {
+      const perm = await MediaLibrary.requestPermissionsAsync(true);
+      if (!perm.granted) {
+        Alert.alert('Нет доступа', 'Разреши сохранение в галерею в настройках приложения.');
+        return;
+      }
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('Готово', 'Картинка сохранена в галерею.');
+    } catch (e: any) {
+      Alert.alert('Не удалось сохранить', String(e?.message ?? e));
     }
   };
 
@@ -270,6 +360,7 @@ export default function ChatScreen(p: Props) {
     if (generating) return;
     setMessages([]);
     setPending([]);
+    FS.deleteAsync(HISTORY_FILE, { idempotent: true }).catch(() => {});
   };
 
   const renderItem = ({ item }: { item: ChatMsg }) => {
@@ -315,8 +406,31 @@ export default function ChatScreen(p: Props) {
             {item.text}
           </Text>
         )}
+        {item.generated && item.images.length > 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 }}>
+            <Pressable
+              onPress={() => item.images[0] && saveToGallery(item.images[0])}
+              style={[S.btn2, { paddingVertical: 6, marginRight: 6, marginBottom: 4 }]}
+            >
+              <Text style={S.btn2Text}>Сохранить в галерею</Text>
+            </Pressable>
+            {item.drawPrompt && p.sdUri ? (
+              <Pressable
+                onPress={() => redraw(item.drawPrompt as string)}
+                disabled={generating}
+                style={[
+                  S.btn2,
+                  { paddingVertical: 6, marginBottom: 4 },
+                  generating ? S.disabled : null,
+                ]}
+              >
+                <Text style={S.btn2Text}>Ещё вариант</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         {item.generated ? (
-          <Text style={[S.dim, { fontSize: 11 }]}>Нажми на картинку, чтобы сохранить или поделиться</Text>
+          <Text style={[S.dim, { fontSize: 11 }]}>Нажми на картинку, чтобы поделиться</Text>
         ) : null}
         {item.stats ? <Text style={[S.dim, { marginTop: 4, fontSize: 11 }]}>{item.stats}</Text> : null}
       </View>

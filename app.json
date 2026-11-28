@@ -29,6 +29,14 @@
           "cameraPermission": "Камера нужна, чтобы отправлять фото в чат.",
           "photosPermission": "Доступ к галерее нужен, чтобы отправлять картинки в чат."
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Доступ к галерее нужен, чтобы сохранять нарисованные картинки.",
+          "savePhotosPermission": "Разреши сохранять нарисованные картинки в галерею.",
+          "isAccessMediaLocationEnabled": false
+        }
       ]
     ],
     "icon": "./assets/icon.png"
